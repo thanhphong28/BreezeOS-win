@@ -389,6 +389,8 @@ pub struct Settings {
     pub rail_reveal: Reveal,
     pub notch_reveal: Reveal,
     pub notch_scale: u8,
+    pub notch_height: u8,
+    pub rail_scale: u8,
     pub island_gap: u8,
     pub update_check: bool,
     pub notch_glow: bool,
@@ -487,6 +489,8 @@ impl Default for Settings {
             rail_reveal: Reveal::Quick,
             notch_reveal: Reveal::Quick,
             notch_scale: 100,
+            notch_height: 100,
+            rail_scale: 100,
             island_gap: 7,
             update_check: true,
             notch_glow: true,
@@ -519,6 +523,8 @@ impl Settings {
     pub fn parse(text: &str) -> Settings {
         let mut s = Settings::default();
         let mut legacy_glass = false;
+        let mut saw_notch_scale = false;
+        let mut saw_notch_height = false;
         for line in text.trim_start_matches('\u{feff}').lines() {
             let line = line.trim();
             if line.is_empty() || line.starts_with('#') {
@@ -723,7 +729,19 @@ impl Settings {
                 "dock_reveal" => s.dock_reveal = Reveal::parse(v).unwrap_or(s.dock_reveal),
                 "rail_reveal" => s.rail_reveal = Reveal::parse(v).unwrap_or(s.rail_reveal),
                 "notch_reveal" => s.notch_reveal = Reveal::parse(v).unwrap_or(s.notch_reveal),
-                "notch_scale" => s.notch_scale = v.trim_end_matches('%').parse::<u16>().map(|n| n.clamp(80, 130) as u8).unwrap_or(s.notch_scale),
+                "notch_scale" | "notch_width" => {
+                    if let Ok(n) = v.trim_end_matches('%').parse::<u16>() {
+                        s.notch_scale = n.clamp(60, 180) as u8;
+                        saw_notch_scale = true;
+                    }
+                }
+                "notch_height" => {
+                    if let Ok(n) = v.trim_end_matches('%').parse::<u16>() {
+                        s.notch_height = n.clamp(70, 180) as u8;
+                        saw_notch_height = true;
+                    }
+                }
+                "rail_scale" => s.rail_scale = v.trim_end_matches('%').parse::<u16>().map(|n| n.clamp(70, 160) as u8).unwrap_or(s.rail_scale),
                 "island_gap" => s.island_gap = v.parse::<u16>().map(|n| n.min(40) as u8).unwrap_or(s.island_gap),
                 "update_check" => s.update_check = parse_bool(v).unwrap_or(s.update_check),
                 "notch_glow" => s.notch_glow = parse_bool(v).unwrap_or(s.notch_glow),
@@ -759,12 +777,15 @@ impl Settings {
         if legacy_glass {
             s.menubar_glass = false;
         }
+        if saw_notch_scale && !saw_notch_height {
+            s.notch_height = s.notch_scale.clamp(70, 180);
+        }
         s
     }
 
     pub fn serialize(&self) -> String {
         format!(
-            "# BreezeOS settings\ntakeover={}\ndock={}\nnotch={}\nblur={}\nstyle={}\ntransparency={}\ntheme={}\nlang={}\ndock_material={}\ndock_round={}\nnotch_material={}\nnotch_round={}\nautostart={}\ndock_size={}\ndock_gap={}\ndock_zoom={}\ndock_margin={}\nanim={}\nrefraction={}\ndock_enabled={}\nnotch_enabled={}\nnotch_hover_open={}\nwin_shadow={}\nmenubar={}\nclock_24h={}\nmenubar_glass={}\nhot_tl={}\nhot_tr={}\nhot_bl={}\nhot_br={}\nstage={}\nswitcher={}\nstage_right={}\nstage_size={}\nstage_gap={}\nstage_count={}\nstage_speed={}\nstage_desktop_click={}\nstage_media={}\nstage_icons={}\nstage_titles={}\nhide_desktop_icons={}\nmenubar_style={}\ndock_plates={}\nover_fullscreen={}\nclipboard_history={}\nicon_style={}\nicon_tint={}\naccent={}\nmac_shortcuts={}\ndownloads_stack={}\nrecent_apps={}\nicon_pack={}\nmenubar_material={}\nicon_variant={}\nmin_effect={}\nnotch_idle={}\ngreet_name={}\ngreet_text={}\nlyrics_compact={}\nlyrics_online={}\nnotch_downloads={}\nnotch_send={}\nui_scale={}\nnotch_island={}\nwidget_style={}\nbattery_pct={}\nrail={}\nnotch_scale={}\nisland_gap={}\nupdate_check={}\nnotch_glow={}\npill_devices={}\npill_notices={}\npill_reminders={}\ntodo_hotkey={}\ndeck_screen={}\nrail_screen={}\nnotch_screen={}\nwidget_screen={}\npreset={}\nvisualizer={}\nfont={}\nreduce_motion={}\nfocus_cat={}\nfocus_mins={}\nbreak_mins={}\nfocus_name={}\nmeeting_companion={}\ncapsule={}\ncapsule_layout={}\ncapsule_decor={}\naccent_rgb={}\ndock_reveal={}\nrail_reveal={}\nnotch_reveal={}\n",
+            "# BreezeOS settings\ntakeover={}\ndock={}\nnotch={}\nblur={}\nstyle={}\ntransparency={}\ntheme={}\nlang={}\ndock_material={}\ndock_round={}\nnotch_material={}\nnotch_round={}\nautostart={}\ndock_size={}\ndock_gap={}\ndock_zoom={}\ndock_margin={}\nanim={}\nrefraction={}\ndock_enabled={}\nnotch_enabled={}\nnotch_hover_open={}\nwin_shadow={}\nmenubar={}\nclock_24h={}\nmenubar_glass={}\nhot_tl={}\nhot_tr={}\nhot_bl={}\nhot_br={}\nstage={}\nswitcher={}\nstage_right={}\nstage_size={}\nstage_gap={}\nstage_count={}\nstage_speed={}\nstage_desktop_click={}\nstage_media={}\nstage_icons={}\nstage_titles={}\nhide_desktop_icons={}\nmenubar_style={}\ndock_plates={}\nover_fullscreen={}\nclipboard_history={}\nicon_style={}\nicon_tint={}\naccent={}\nmac_shortcuts={}\ndownloads_stack={}\nrecent_apps={}\nicon_pack={}\nmenubar_material={}\nicon_variant={}\nmin_effect={}\nnotch_idle={}\ngreet_name={}\ngreet_text={}\nlyrics_compact={}\nlyrics_online={}\nnotch_downloads={}\nnotch_send={}\nui_scale={}\nnotch_island={}\nwidget_style={}\nbattery_pct={}\nrail={}\nnotch_scale={}\nnotch_height={}\nrail_scale={}\nisland_gap={}\nupdate_check={}\nnotch_glow={}\npill_devices={}\npill_notices={}\npill_reminders={}\ntodo_hotkey={}\ndeck_screen={}\nrail_screen={}\nnotch_screen={}\nwidget_screen={}\npreset={}\nvisualizer={}\nfont={}\nreduce_motion={}\nfocus_cat={}\nfocus_mins={}\nbreak_mins={}\nfocus_name={}\nmeeting_companion={}\ncapsule={}\ncapsule_layout={}\ncapsule_decor={}\naccent_rgb={}\ndock_reveal={}\nrail_reveal={}\nnotch_reveal={}\n",
             self.takeover,
             self.dock.key(),
             self.notch.key(),
@@ -834,6 +855,8 @@ impl Settings {
             self.battery_pct,
             self.rail.key(),
             self.notch_scale,
+            self.notch_height,
+            self.rail_scale,
             self.island_gap,
             self.update_check,
             self.notch_glow,
@@ -1160,9 +1183,11 @@ menubar_material=true
         assert_eq!(Settings::parse("battery_pct=9").battery_pct, 2);
         assert_eq!(Settings::default().battery_pct, 2);
         let r = Settings::parse(&Settings::parse("rail=smart\nnotch_scale=120%\nisland_gap=18\n").serialize());
-        assert_eq!((r.rail, r.notch_scale, r.island_gap), (Behavior::Smart, 120, 18));
-        assert_eq!((Settings::parse("notch_scale=300").notch_scale, Settings::parse("island_gap=99").island_gap), (130, 40));
-        assert_eq!((Settings::default().rail, Settings::default().notch_scale, Settings::default().island_gap), (Behavior::Fixed, 100, 7));
+        assert_eq!((r.rail, r.notch_scale, r.notch_height, r.island_gap), (Behavior::Smart, 120, 120, 18));
+        assert_eq!((Settings::parse("notch_scale=300").notch_scale, Settings::parse("island_gap=99").island_gap), (180, 40));
+        let sep = Settings::parse(&Settings::parse("notch_scale=150\nnotch_height=85\nrail_scale=135\n").serialize());
+        assert_eq!((sep.notch_scale, sep.notch_height, sep.rail_scale), (150, 85, 135));
+        assert_eq!((Settings::default().rail, Settings::default().notch_scale, Settings::default().notch_height, Settings::default().rail_scale, Settings::default().island_gap), (Behavior::Fixed, 100, 100, 100, 7));
         let d = Settings::default();
         assert_eq!((d.update_check, d.notch_glow, d.pill_devices, d.pill_notices, d.pill_reminders, d.todo_hotkey), (true, true, true, false, true, true));
         let f = Settings::parse(&Settings::parse("update_check=0\nnotch_glow=0\npill_devices=0\npill_notices=1\npill_reminders=0\ntodo_hotkey=0\n").serialize());

@@ -253,6 +253,10 @@ impl Menu {
         self.card = card;
     }
 
+    pub fn set_dpi(&mut self, dpi: f32) {
+        self.dpi = dpi;
+    }
+
     pub fn show_card(&mut self, comp: &Compositor, gfx: &Gfx, items: Vec<Item>, x: i32, top: i32, right_aligned: bool) -> Result<()> {
         self.show_impl(comp, gfx, items, x, top, false, right_aligned)
     }

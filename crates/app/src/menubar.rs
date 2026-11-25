@@ -195,6 +195,10 @@ fn rail_monitor() -> nacre_core::display::Monitor {
     nacre_platform::monitors::target(prefs::get().rail_screen)
 }
 
+fn rail_dpi(mon: &nacre_core::display::Monitor) -> f32 {
+    mon.scale() * prefs::ui_scale() * prefs::get().rail_scale as f32 / 100.0
+}
+
 pub fn init(comp: &Compositor) -> windows_core::Result<()> {
     unsafe {
         let hi: HINSTANCE = GetModuleHandleW(None)?.into();
@@ -256,13 +260,8 @@ fn apply_prefs() {
         log::line("menubar", "dihancurkan");
         services::post_island(crate::prefs::WM_PREFS);
     } else if want {
-        let rescale = with_bar(|b| {
-            let mon = rail_monitor();
-            let want_dpi = mon.scale() * prefs::ui_scale();
-            (want_dpi - b.dpi).abs() > 0.01 || mon.area != b.area
-        })
-        .unwrap_or(false);
-        if rescale {
+        let moved = with_bar(|b| rail_monitor().area != b.area).unwrap_or(false);
+        if moved {
             let b = BAR.with(|c| c.borrow_mut().take());
             if let Some(b) = b {
                 b.menu.hide();
@@ -275,6 +274,12 @@ fn apply_prefs() {
             return;
         }
         with_bar(|b| {
+            let want_dpi = rail_dpi(&rail_monitor());
+            if (want_dpi - b.dpi).abs() > 0.005 {
+                b.dpi = want_dpi;
+                b.menu.set_dpi(want_dpi);
+                b.cache.clear();
+            }
             b.apply_look();
             b.relayout();
             b.render();
@@ -289,9 +294,8 @@ fn create(comp: &Compositor) -> windows_core::Result<Box<Bar>> {
     let screen = area.size();
     let glass = prefs::apply(nacre_ui::glass::GlassParams::dark((10.0, 10.0), 0.0), &prefs::bar_look());
     let mut popup = Popup::new(comp, w!("BreezeOSMenuBar"), Some(bar_proc), WINDOW_EX_STYLE(0), glass)?;
-    let dpi = mon.scale() * prefs::ui_scale();
-    let notch_h = services::notch_on(area).map(|(_, _, h)| h as f32 / dpi);
-    let h = (notch_h.unwrap_or(26.0) * dpi).round() as i32;
+    let dpi = rail_dpi(&mon);
+    let h = (26.0 * dpi).round().max(18.0) as i32;
     let tier = {
         let c = sys::conditions();
         if !c.transparency || c.battery_saver || c.remote_session { Tier::Solid } else { Tier::Full }
@@ -697,7 +701,7 @@ impl Bar {
         let (l, r) = lay::layout(self.screen.0 as f32, 6.0 * d, &left, &right, gap);
         self.left = l;
         self.right = r;
-        let want_h = services::notch_on(self.area).map(|(_, _, h)| h).unwrap_or((26.0 * d).round() as i32);
+        let want_h = (26.0 * d).round().max(18.0) as i32;
         if want_h != self.h {
             self.h = want_h;
             let _ = self.popup.set_rect(self.area.x, self.area.y, self.screen.0, self.h);

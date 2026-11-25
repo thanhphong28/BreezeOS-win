@@ -265,12 +265,18 @@ fn notch_monitor() -> nacre_core::display::Monitor {
     nacre_platform::monitors::target(crate::prefs::get().notch_screen)
 }
 
-fn notch_dpi(mon: &nacre_core::display::Monitor) -> f32 {
-    mon.scale() * crate::prefs::ui_scale() * crate::prefs::get().notch_scale as f32 / 100.0
+fn notch_metrics(mon: &nacre_core::display::Monitor) -> (f32, f32, (f32, f32)) {
+    let s = crate::prefs::get();
+    let base = mon.scale() * crate::prefs::ui_scale();
+    let (kw, kh) = (s.notch_scale as f32 / 100.0, s.notch_height as f32 / 100.0);
+    let content_dpi = base * kw.min(kh).clamp(0.70, 1.40);
+    (base, content_dpi, (kw, kh))
 }
 
-fn win_size(dpi: f32, screen_w: i32) -> (i32, i32) {
-    (((WIN_W * dpi) as i32).min(screen_w), (WIN_H * dpi + island_gap(dpi)).ceil() as i32)
+fn win_size(base_dpi: f32, scales: (f32, f32), area: nacre_core::display::Area) -> (i32, i32) {
+    let w = ((WIN_W * base_dpi * scales.0).ceil() as i32).min(area.w);
+    let h = ((WIN_H * base_dpi * scales.1 + island_gap(base_dpi)).ceil() as i32).min(area.h);
+    (w, h)
 }
 
 pub struct Notch {
@@ -280,6 +286,8 @@ pub struct Notch {
     body: Body,
     shadow: Option<Shadow>,
     dpi: f32,
+    base_dpi: f32,
+    scales: (f32, f32),
     win: (i32, i32),
     screen_w: i32,
     area: nacre_core::display::Area,
@@ -399,10 +407,10 @@ impl Notch {
                 None, None, Some(hi), None,
             )?;
             let mon = notch_monitor();
-            let dpi = notch_dpi(&mon);
+            let (base_dpi, dpi, scales) = notch_metrics(&mon);
             let area = mon.area;
             let screen_w = area.w;
-            let win = win_size(dpi, screen_w);
+            let win = win_size(base_dpi, scales, area);
             let _ = SetWindowPos(hwnd, None, area.x + (screen_w - win.0) / 2, area.y, win.0, win.1, SWP_NOACTIVATE | SWP_NOZORDER);
             let comp = host.compositor.clone();
             let surface = host.attach(hwnd, (win.0 as f32, win.1 as f32))?;
@@ -425,12 +433,14 @@ impl Notch {
                 body,
                 shadow,
                 dpi,
+                base_dpi,
+                scales,
                 win,
                 screen_w,
                 area,
                 mode: Mode::Rest,
                 look: rest,
-                size: state::size(rest, dpi),
+                size: state::size_wh(rest, base_dpi, scales.0, scales.1),
                 first: true,
                 tracking: false,
                 hover_act: None,
@@ -972,15 +982,20 @@ impl Notch {
         }
     }
 
+    fn sized(&self, look: Look) -> Size {
+        state::size_wh(look, self.base_dpi, self.scales.0, self.scales.1)
+    }
+
     fn apply_size(&mut self, springy: Option<(f32, u32)>) {
         let (px0, pw, ph) = (self.x0(), self.size.w, self.size.h);
-        let mut z = state::size(self.look, self.dpi);
+        let mut z = self.sized(self.look);
         z.radius *= crate::prefs::round(crate::prefs::Role::Notch);
-        z.w = z.w.min(self.win.0 as f32 - 16.0 * self.dpi).max(z.h).round();
-        z.h = z.h.round();
-        let gap = island_gap(self.dpi);
+        let gap = island_gap(self.base_dpi);
+        z.w = z.w.min(self.win.0 as f32 - 16.0 * self.dpi).max((48.0 * self.dpi).min(self.win.0 as f32 - 16.0 * self.dpi)).round();
+        z.h = z.h.min((self.win.1 as f32 - gap).max(16.0)).max(16.0).round();
+        z.radius = z.radius.min(z.w / 2.0).min(z.h / 2.0);
         if gap > 0.0 {
-            z.radius = (z.h / 2.0).min(36.0 * self.dpi);
+            z.radius = (z.h / 2.0).min(36.0 * self.base_dpi * self.scales.1).min(z.w / 2.0);
         }
         ISLAND_GAP.store(gap.to_bits(), std::sync::atomic::Ordering::Relaxed);
         self.body.set_island(gap, self.shown);
@@ -1011,7 +1026,7 @@ impl Notch {
 
     fn settle_region(&self) {
         let (x0, e) = (self.x0(), self.body.ear);
-        self.set_region(((x0 - e).max(0.0), 0.0, (x0 + self.size.w + e).min(self.win.0 as f32), island_gap(self.dpi) + self.size.h));
+        self.set_region(((x0 - e).max(0.0), 0.0, (x0 + self.size.w + e).min(self.win.0 as f32), island_gap(self.base_dpi) + self.size.h));
     }
 
     fn render(&mut self) {
@@ -2186,7 +2201,7 @@ impl Notch {
     }
 
     fn pill_screen_rect(&self) -> (i32, i32, i32, i32) {
-        let base = state::size(state::look(Mode::Rest, None), self.dpi);
+        let base = self.sized(state::look(Mode::Rest, None));
         let l = self.area.x + ((self.area.w as f32 - base.w) / 2.0) as i32;
         (l, self.area.y, l + base.w as i32, self.area.y + (base.h + 4.0 * self.dpi) as i32)
     }
@@ -2364,7 +2379,7 @@ impl Notch {
     fn set_reserved(&mut self, on: bool) {
         self.reserved = on;
         if on {
-            let strip = (34.0 * self.dpi).ceil() as i32;
+            let strip = (34.0 * self.base_dpi * self.scales.1).ceil() as i32;
             let r = nacre_platform::shell::appbar::reserve_top(self.hwnd, self.area, strip);
             log::line("appbar", &format!("atas strip={strip} hasil={r:?}"));
         } else {
@@ -2425,7 +2440,7 @@ impl Notch {
             return;
         }
         let Ok(comp) = self.body.stage.Compositor() else { return };
-        let (x0, w, h, gap) = (self.x0(), self.size.w, self.size.h, island_gap(self.dpi));
+        let (x0, w, h, gap) = (self.x0(), self.size.w, self.size.h, island_gap(self.base_dpi));
         let cx = x0 + w / 2.0;
         let center = windows_numerics::Vector3 { X: cx, Y: if to_island { gap + h / 2.0 } else { 0.0 }, Z: 0.0 };
         let _ = crate::motion::droplet(&comp, &self.body.stage, center, to_island);
@@ -2447,22 +2462,25 @@ impl Notch {
     fn on_reconfigure(&mut self) {
         let mon = notch_monitor();
         let screen_w = mon.area.w;
-        let dpi = notch_dpi(&mon);
-        let win = win_size(dpi, screen_w);
-        if win == self.win && mon.area == self.area && (dpi - self.dpi).abs() < 0.01 {
+        let (base_dpi, dpi, scales) = notch_metrics(&mon);
+        let win = win_size(base_dpi, scales, mon.area);
+        if win == self.win && mon.area == self.area && (dpi - self.dpi).abs() < 0.005 && (base_dpi - self.base_dpi).abs() < 0.005 && self.scales == scales {
             return;
         }
-        log::line("notch", &format!("konfigurasi ulang layar_w={screen_w} dpi={dpi}"));
-        let dpi_changed = (dpi - self.dpi).abs() >= 0.01;
+        log::line("notch", &format!("konfigurasi ulang layar_w={screen_w} dpi={dpi} scales={scales:?}"));
+        let dpi_changed = (dpi - self.dpi).abs() >= 0.005;
+        let height_changed = (scales.1 - self.scales.1).abs() >= 0.005 || (base_dpi - self.base_dpi).abs() >= 0.005;
         let moved = mon.area != self.area;
         self.screen_w = screen_w;
         self.area = mon.area;
         self.dpi = dpi;
+        self.base_dpi = base_dpi;
+        self.scales = scales;
         self.win = win;
         unsafe {
             let _ = SetWindowPos(self.hwnd, None, self.win_x(), self.area.y, win.0, win.1, SWP_NOACTIVATE | SWP_NOZORDER);
         }
-        if moved && self.reserved {
+        if (moved || height_changed) && self.reserved {
             self.set_reserved(true);
         }
         let _ = self._surface.root.SetSize(Vector2 { X: win.0 as f32, Y: win.1 as f32 });

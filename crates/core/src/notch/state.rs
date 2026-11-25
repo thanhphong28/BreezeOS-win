@@ -199,6 +199,14 @@ pub fn size(l: Look, dpi: f32) -> Size {
     Size { w: w * dpi, h: h * dpi, radius: r * dpi }
 }
 
+pub fn size_wh(l: Look, dpi: f32, kw: f32, kh: f32) -> Size {
+    let base = size(l, dpi);
+    let w = base.w * kw;
+    let h = base.h * kh;
+    let radius = (base.radius * kw.min(kh)).min(w / 2.0).min(h / 2.0);
+    Size { w, h, radius }
+}
+
 pub fn shadow(l: Look) -> (f32, f32, f32) {
     let strong = l.peek || matches!(l.view, View::Open(_) | View::Drop);
     if strong {
@@ -324,6 +332,9 @@ mod tests {
         assert!(many.h > few.h && capped.h == todo_height(TODO_MAX_ROWS + 1) && capped.h <= 384.0);
         let b = size(look(Mode::Open(Tab::Play), None), 1.5);
         assert_eq!((b.w, b.radius), (900.0, 42.0));
+        let wh = size_wh(look(Mode::Rest, None), 1.0, 1.5, 0.8);
+        assert_eq!((wh.w, wh.h), (184.0 * 1.5, 30.0 * 0.8));
+        assert!(wh.radius <= wh.w / 2.0 && wh.radius <= wh.h / 2.0);
     }
 
     #[test]
