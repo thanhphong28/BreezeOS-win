@@ -78,7 +78,10 @@ pub fn activate(target: isize, dock: isize) -> bool {
             }
         }
         let is_front = fg == hwnd || GetAncestor(fg, GA_ROOTOWNER) == hwnd;
-        if is_front && IsWindowVisible(hwnd).as_bool() && !IsIconic(hwnd).as_bool() {
+        let offscreen = !IsIconic(hwnd).as_bool() && !super::park::is_on_screen(target);
+        if offscreen {
+            super::park::rescue_offscreen(target);
+        } else if is_front && IsWindowVisible(hwnd).as_bool() && !IsIconic(hwnd).as_bool() {
             let _ = ShowWindow(hwnd, SW_MINIMIZE);
             return IsIconic(hwnd).as_bool();
         }
@@ -88,6 +91,8 @@ pub fn activate(target: isize, dock: isize) -> bool {
         }
         if IsIconic(hwnd).as_bool() {
             let _ = ShowWindow(hwnd, SW_RESTORE);
+        } else if !super::park::is_on_screen(target) {
+            super::park::rescue_offscreen(target);
         }
         if SetForegroundWindow(hwnd).as_bool() && GetForegroundWindow() == hwnd {
             return true;
@@ -121,6 +126,8 @@ pub fn force_foreground(target: isize) -> bool {
         }
         if IsIconic(hwnd).as_bool() {
             let _ = ShowWindow(hwnd, SW_RESTORE);
+        } else if !super::park::is_on_screen(target) {
+            super::park::rescue_offscreen(target);
         }
         if GetForegroundWindow() == hwnd {
             return true;

@@ -360,10 +360,10 @@ impl St {
 
     fn refresh(&mut self) {
         let now = std::time::Instant::now();
-        if self.fly.is_some() || now < self.busy_until {
+        if self.fly.is_some() || now < self.busy_until || park::user_dragging() {
             let wait = self.busy_until.saturating_duration_since(now).as_millis() as u32 + 60;
             unsafe {
-                SetTimer(Some(self.ctl), T_FG, wait.max(80), None);
+                SetTimer(Some(self.ctl), T_FG, wait.max(120), None);
             }
             return;
         }
@@ -549,10 +549,11 @@ impl St {
                 let sw = nacre_platform::sys::screen_size().0;
                 let right = self.strip.as_ref().map(|s| s.right).unwrap_or(false);
                 let edge = self.strip.as_ref().map(|s| (s.w + 8.0 * s.dpi) as i32).unwrap_or(0);
-                if !q.maximized && right && q.rect.2 > sw - edge {
+                let on_primary = q.rect.0 >= 0 && q.rect.0 < sw && q.rect.2 <= sw + 32;
+                if !q.maximized && on_primary && right && q.rect.2 > sw - edge {
                     let dx = (q.rect.2 - (sw - edge)).min(q.rect.0.max(0));
                     q.rect = (q.rect.0 - dx, q.rect.1, q.rect.2 - dx, q.rect.3);
-                } else if !q.maximized && !right && q.rect.0 < edge {
+                } else if !q.maximized && on_primary && !right && q.rect.0 < edge {
                     let dx = edge - q.rect.0;
                     q.rect = (q.rect.0 + dx, q.rect.1, q.rect.2 + dx, q.rect.3);
                     if q.rect.2 > sw {

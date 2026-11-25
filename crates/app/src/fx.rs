@@ -57,7 +57,7 @@ fn hold_parked(p: Option<Parked>) {
 fn release_parked() {
     let p = OPEN_PARKED.lock().unwrap_or_else(|e| e.into_inner()).take();
     if let Some(p) = p {
-        if park::is_parked(p.hwnd) {
+        if park::is_parked(p.hwnd) || !park::is_on_screen(p.hwnd) {
             park::unpark(&p);
         }
     }
@@ -135,6 +135,12 @@ pub fn init(host: &Host) -> windows_core::Result<()> {
     let n = park::restore_file(&open_file());
     if n > 0 {
         log::line("fx", &format!("{n} jendela yang sedang dibuka sesi lalu dikembalikan"));
+    }
+    if !prefs::get().stage {
+        let rescued = park::rescue_all_stranded(std::process::id(), &[]);
+        if rescued > 0 {
+            log::line("fx", &format!("{rescued} jendela di luar layar diselamatkan"));
+        }
     }
     unsafe {
         let hi: HINSTANCE = GetModuleHandleW(None)?.into();
@@ -268,7 +274,7 @@ fn openable(h: isize, screen: (i32, i32)) -> bool {
         }
     }
     match snapshot::frame_rect(h) {
-        Some((x, y, w, hh)) => w >= 120 && hh >= 80 && !(w >= screen.0 && hh >= screen.1) && x > -2000 && y > -2000,
+        Some((_, _, w, hh)) => w >= 120 && hh >= 80 && !(w >= screen.0 && hh >= screen.1) && park::is_on_screen(h),
         None => false,
     }
 }
@@ -546,6 +552,14 @@ impl Fx {
         if self.opened.contains(&h) || self.opening.as_ref().is_some_and(|o| o.hwnd == h) {
             return;
         }
+        // Never park or hijack a window created while dragging (e.g. tearing off a browser tab).
+        if park::user_dragging() {
+            if eligible(h) {
+                flag(h);
+                self.opened.insert(h);
+            }
+            return;
+        }
         if !openable(h, self.screen) {
             return;
         }
@@ -575,15 +589,19 @@ impl Fx {
             }
             return;
         };
-        if playing {
-            return;
-        }
-        if !focus::is_alive(h) || !park::is_parked(h) {
+        if !focus::is_alive(h) {
             self.opening = None;
             hold_parked(None);
             unsafe {
                 let _ = KillTimer(Some(self.hwnd), T_OPEN_POLL);
             }
+            return;
+        }
+        if park::user_dragging() || !park::is_parked(h) {
+            self.end_open();
+            return;
+        }
+        if playing {
             return;
         }
         let shot = snapshot::capture(h, 1).filter(|s| !crate::stage::blank(&s.bmp));
