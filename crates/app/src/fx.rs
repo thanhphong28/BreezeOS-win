@@ -296,6 +296,18 @@ fn eligible(h: isize) -> bool {
     }
 }
 
+pub fn surface_for(hwnd: isize) -> Option<(CompositionDrawingSurface, i32, i32)> {
+    with_fx(|fx| {
+        fx.parked
+            .iter()
+            .rev()
+            .find(|s| s.hwnd == hwnd)
+            .or_else(|| fx.snap.as_ref().filter(|s| s.hwnd == hwnd))
+            .map(|s| (s.surface.clone(), s.rect.2, s.rect.3))
+    })
+    .flatten()
+}
+
 pub fn restore(target: isize, icon: (i32, i32, i32, i32), dock: isize) -> bool {
     if !enabled() {
         return false;
@@ -687,7 +699,7 @@ impl Fx {
                         self.play(surface, rect, icon, Kind::Minimize);
                         self.parked.retain(|p| p.hwnd != h);
                         self.parked.push(keep);
-                        if self.parked.len() > 2 {
+                        if self.parked.len() > 8 {
                             self.parked.remove(0);
                         }
                     }

@@ -23,8 +23,9 @@ use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::HiDpi::GetDpiForWindow;
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    GetKeyState, TrackMouseEvent, TME_LEAVE, TRACKMOUSEEVENT, RegisterHotKey, UnregisterHotKey, MOD_ALT, MOD_CONTROL, MOD_NOREPEAT, MOD_SHIFT, VK_BACK, VK_DELETE, VK_CONTROL, VK_DOWN, VK_ESCAPE, VK_LEFT, VK_RETURN, VK_RIGHT,
-    VK_SPACE, VK_TAB, VK_UP,
+    GetAsyncKeyState, GetKeyState, TrackMouseEvent, TME_LEAVE, TRACKMOUSEEVENT, RegisterHotKey, UnregisterHotKey, MOD_ALT, MOD_CONTROL, MOD_NOREPEAT, MOD_SHIFT,
+    VK_BACK, VK_CONTROL, VK_DELETE, VK_DOWN, VK_ESCAPE, VK_LCONTROL, VK_LEFT, VK_LSHIFT, VK_LWIN, VK_MENU, VK_RCONTROL, VK_RETURN, VK_RIGHT, VK_RSHIFT, VK_RWIN,
+    VK_SHIFT, VK_SPACE, VK_TAB, VK_UP,
 };
 use windows::Win32::UI::WindowsAndMessaging::*;
 use windows_numerics::{Vector2, Vector3};
@@ -40,7 +41,149 @@ const T_FINISH: usize = 9;
 const HOTKEY_ID: i32 = 0xAB01;
 const HOTKEY_APPS: i32 = 0xAB02;
 const HOTKEY_TASKS: i32 = 0xAB03;
+const WM_SPOT_HK: u32 = WM_APP + 87;
+pub const WM_HK_RECORDED: u32 = WM_APP + 88;
+const MAGIC_EXTRA: usize = 0xB2EE_2E05;
+
 static TASKS_KEY: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+static SPOT_CTL: std::sync::atomic::AtomicIsize = std::sync::atomic::AtomicIsize::new(0);
+static SEARCH_HK: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+static SEARCH_REG: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+static HOOK_ACTIVE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+static RECORD_HWND: std::sync::atomic::AtomicIsize = std::sync::atomic::AtomicIsize::new(0);
+static KEY_HOOK: Mutex<Option<nacre_platform::hookthread::HookThread>> = Mutex::new(None);
+
+unsafe fn suppress_win_menu() {
+    use windows::Win32::UI::Input::KeyboardAndMouse::{
+        SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS, KEYEVENTF_KEYUP, VIRTUAL_KEY,
+    };
+    let mk = |flags: KEYBD_EVENT_FLAGS| INPUT {
+        r#type: INPUT_KEYBOARD,
+        Anonymous: INPUT_0 {
+            ki: KEYBDINPUT { wVk: VIRTUAL_KEY(0xFF), wScan: 0, dwFlags: flags, time: 0, dwExtraInfo: MAGIC_EXTRA },
+        },
+    };
+    let inputs = [mk(KEYBD_EVENT_FLAGS(0)), mk(KEYEVENTF_KEYUP)];
+    let _ = SendInput(&inputs, std::mem::size_of::<INPUT>() as i32);
+}
+
+unsafe extern "system" fn ll_key(code: i32, wp: WPARAM, lp: LPARAM) -> LRESULT {
+    use nacre_core::settings::{Hotkey, HK_ALT, HK_CTRL, HK_SHIFT, HK_WIN};
+    use std::sync::atomic::Ordering::Relaxed;
+    if code >= 0 {
+        let k = &*(lp.0 as *const KBDLLHOOKSTRUCT);
+        if k.dwExtraInfo != MAGIC_EXTRA {
+            let down = wp.0 as u32 == WM_KEYDOWN || wp.0 as u32 == WM_SYSKEYDOWN;
+            if down {
+                let vk = k.vkCode as u16;
+                let ctrl = GetAsyncKeyState(VK_CONTROL.0 as i32) < 0
+                    || GetAsyncKeyState(VK_LCONTROL.0 as i32) < 0
+                    || GetAsyncKeyState(VK_RCONTROL.0 as i32) < 0;
+                let alt = (k.flags.0 & LLKHF_ALTDOWN.0 != 0) || GetAsyncKeyState(VK_MENU.0 as i32) < 0;
+                let shift = GetAsyncKeyState(VK_SHIFT.0 as i32) < 0
+                    || GetAsyncKeyState(VK_LSHIFT.0 as i32) < 0
+                    || GetAsyncKeyState(VK_RSHIFT.0 as i32) < 0;
+                let win = GetAsyncKeyState(VK_LWIN.0 as i32) < 0 || GetAsyncKeyState(VK_RWIN.0 as i32) < 0;
+                let mods = (if ctrl { HK_CTRL } else { 0 })
+                    | (if alt { HK_ALT } else { 0 })
+                    | (if shift { HK_SHIFT } else { 0 })
+                    | (if win { HK_WIN } else { 0 });
+
+                let rec = RECORD_HWND.load(Relaxed);
+                if rec != 0 {
+                    if vk == VK_ESCAPE.0 && mods == 0 {
+                        let _ = PostMessageW(Some(HWND(rec as *mut _)), WM_HK_RECORDED, WPARAM(0), LPARAM(0));
+                        return LRESULT(1);
+                    }
+                    if !Hotkey::is_modifier_vk(vk) && vk != 0xFF {
+                        if let Some(hk) = Hotkey::from_parts(mods, vk) {
+                            if win {
+                                suppress_win_menu();
+                            }
+                            let packed = ((hk.mods as usize) << 16) | (hk.vk as usize);
+                            let _ = PostMessageW(Some(HWND(rec as *mut _)), WM_HK_RECORDED, WPARAM(packed), LPARAM(0));
+                        } else {
+                            let _ = PostMessageW(Some(HWND(rec as *mut _)), WM_HK_RECORDED, WPARAM(usize::MAX), LPARAM(0));
+                        }
+                        return LRESULT(1);
+                    }
+                } else if HOOK_ACTIVE.load(Relaxed) {
+                    let raw = SEARCH_HK.load(Relaxed);
+                    let want_mods = ((raw >> 16) & 0xFF) as u8;
+                    let want_vk = (raw & 0xFFFF) as u16;
+                    if vk == want_vk && mods == want_mods {
+                        if win {
+                            suppress_win_menu();
+                        }
+                        let ctl = SPOT_CTL.load(Relaxed);
+                        if ctl != 0 {
+                            let _ = PostMessageW(Some(HWND(ctl as *mut _)), WM_SPOT_HK, WPARAM(0), LPARAM(0));
+                        }
+                        return LRESULT(1);
+                    }
+                }
+            }
+        }
+    }
+    CallNextHookEx(None, code, wp, lp)
+}
+
+fn ensure_key_hook() {
+    use std::sync::atomic::Ordering::Relaxed;
+    let need = HOOK_ACTIVE.load(Relaxed) || RECORD_HWND.load(Relaxed) != 0;
+    let mut g = KEY_HOOK.lock().unwrap_or_else(|e| e.into_inner());
+    if need && g.is_none() {
+        *g = nacre_platform::hookthread::HookThread::start(nacre_platform::hookthread::Kind::Keyboard, Some(ll_key));
+    } else if !need && g.is_some() {
+        *g = None;
+    }
+}
+
+pub fn set_recording_target(hwnd: isize) {
+    RECORD_HWND.store(hwnd, std::sync::atomic::Ordering::Relaxed);
+    ensure_key_hook();
+}
+
+fn sync_search_hotkey(hwnd: HWND) {
+    use nacre_core::settings::{HK_ALT, HK_CTRL, HK_SHIFT, HK_WIN};
+    use std::sync::atomic::Ordering::Relaxed;
+    let hk = prefs::get().search_hotkey;
+    let packed = ((hk.mods as u32) << 16) | (hk.vk as u32);
+    if SEARCH_HK.load(Relaxed) == packed && (SEARCH_REG.load(Relaxed) || HOOK_ACTIVE.load(Relaxed)) {
+        return;
+    }
+    unsafe {
+        if SEARCH_REG.swap(false, Relaxed) {
+            let _ = UnregisterHotKey(Some(hwnd), HOTKEY_ID);
+        }
+    }
+    SEARCH_HK.store(packed, Relaxed);
+    // Any Win+<key> shortcut (such as default Win+F, which Windows reserves for Feedback Hub)
+    // is intercepted cleanly via WH_KEYBOARD_LL; non-Win combos try RegisterHotKey first.
+    let mut use_hook = hk.mods & HK_WIN != 0;
+    if !use_hook {
+        let mut m = MOD_NOREPEAT;
+        if hk.mods & HK_CTRL != 0 {
+            m |= MOD_CONTROL;
+        }
+        if hk.mods & HK_ALT != 0 {
+            m |= MOD_ALT;
+        }
+        if hk.mods & HK_SHIFT != 0 {
+            m |= MOD_SHIFT;
+        }
+        unsafe {
+            if RegisterHotKey(Some(hwnd), HOTKEY_ID, m, hk.vk as u32).is_ok() {
+                SEARCH_REG.store(true, Relaxed);
+            } else {
+                use_hook = true;
+            }
+        }
+    }
+    HOOK_ACTIVE.store(use_hook, Relaxed);
+    ensure_key_hook();
+    log::line("spotlight", &format!("pintasan Quick Search aktif: {} (hook={use_hook})", hk.label()));
+}
 
 fn sync_tasks_hotkey(hwnd: HWND) {
     let want = prefs::get().todo_hotkey;
@@ -301,15 +444,14 @@ pub fn init(comp: &Compositor) -> windows_core::Result<()> {
         let class = w!("BreezeOSSpotCtl");
         RegisterClassW(&WNDCLASSW { lpfnWndProc: Some(ctl_proc), hInstance: hi, lpszClassName: class, ..Default::default() });
         let hwnd = CreateWindowExW(WINDOW_EX_STYLE(0), class, w!("breezeos-spot-ctl"), WS_POPUP, 0, 0, 0, 0, Some(HWND_MESSAGE), None, Some(hi), None)?;
-        if RegisterHotKey(Some(hwnd), HOTKEY_ID, MOD_CONTROL | MOD_NOREPEAT, VK_SPACE.0 as u32).is_err() {
-            log::line("spotlight", "Ctrl+Space sudah dipakai program lain; hot key tidak aktif");
-        }
+        let h = hwnd.0 as isize;
+        SPOT_CTL.store(h, std::sync::atomic::Ordering::Relaxed);
         if RegisterHotKey(Some(hwnd), HOTKEY_APPS, MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT, VK_SPACE.0 as u32).is_err() {
             log::line("spotlight", "Ctrl+Shift+Space dipakai program lain; hot key Apps tidak aktif");
         }
-        let h = hwnd.0 as isize;
         CTL.with(|c| *c.borrow_mut() = Some(Ctl { hwnd, comp: comp.clone() }));
         prefs::listen(hwnd);
+        sync_search_hotkey(hwnd);
         sync_tasks_hotkey(hwnd);
         clipboard::set_enabled(prefs::get().clipboard_history);
         apps::refresh(move || {
@@ -320,6 +462,9 @@ pub fn init(comp: &Compositor) -> windows_core::Result<()> {
 }
 
 pub fn shutdown() {
+    RECORD_HWND.store(0, std::sync::atomic::Ordering::Relaxed);
+    HOOK_ACTIVE.store(false, std::sync::atomic::Ordering::Relaxed);
+    ensure_key_hook();
     CTL.with(|c| {
         if let Some(ctl) = c.borrow().as_ref() {
             unsafe {
@@ -1711,6 +1856,10 @@ unsafe extern "system" fn ctl_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
             }
             LRESULT(0)
         }
+        m if m == WM_SPOT_HK => {
+            toggle();
+            LRESULT(0)
+        }
         WM_APPS => {
             with_spot(|s| {
                 s.apps = apps::snapshot();
@@ -1750,6 +1899,7 @@ unsafe extern "system" fn ctl_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
         }
         m if m == prefs::WM_PREFS => {
             clipboard::set_enabled(prefs::get().clipboard_history);
+            sync_search_hotkey(hwnd);
             sync_tasks_hotkey(hwnd);
             LRESULT(0)
         }

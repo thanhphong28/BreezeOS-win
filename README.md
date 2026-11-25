@@ -6,13 +6,13 @@
 
 <p align="center">
   <b>Giao diện kính mờ hiện đại cho Windows 11 — nhẹ, mượt và thuần bản địa (Native Rust).</b><br>
-  Deck · Breeze Notch · Upper Bar · Quick Panel · Tìm kiếm nhanh · Scene · Tiện ích màn hình — chỉ khoảng ~15 MB RAM khi chạy nền.
+  Breeze Bar · Breeze Notch · Upper Bar · Quick Panel · Tìm kiếm nhanh · Scene · Tiện ích màn hình — chỉ khoảng ~15 MB RAM khi chạy nền.
 </p>
 
 <p align="center">
   <a href="https://github.com/thanhphong28/BreezeOS-win/releases"><img alt="Lượt tải" src="https://img.shields.io/github/downloads/thanhphong28/BreezeOS-win/total?label=l%C6%B0%E1%BB%A3t%20t%E1%BA%A3i&color=brightgreen"></a>
   <img alt="Windows 11" src="https://img.shields.io/badge/Windows-11-0078D4?logo=windows11&logoColor=white">
-  <img alt="Phiên bản" src="https://img.shields.io/badge/phi%C3%AAn%20b%E1%BA%A3n-1.0.4-0a84ff">
+  <img alt="Phiên bản" src="https://img.shields.io/badge/phi%C3%AAn%20b%E1%BA%A3n-1.0.5-0a84ff">
   <img alt="Rust" src="https://img.shields.io/badge/Vi%E1%BA%BFt%20b%E1%BA%B1ng-Rust-orange?logo=rust">
   <img alt="Ngôn ngữ" src="https://img.shields.io/badge/Ng%C3%B4n%20ng%E1%BB%AF-Ti%E1%BA%BFng%20Vi%E1%BB%87t%20%C2%B7%20English-purple">
   <img alt="Quyền riêng tư" src="https://img.shields.io/badge/thu%20th%E1%BA%ADp%20d%E1%BB%AF%20li%E1%BB%87u-kh%C3%B4ng-success">
@@ -33,7 +33,7 @@
 > **Phiên bản Truy cập sớm (Early Access).** BreezeOS đang được phát triển tích cực bởi **Nguyễn Thanh Phong (Breeze Boy)**. Một số chi tiết giao diện hoặc thiết lập có thể thay đổi giữa các bản cập nhật. Nếu gặp lỗi hoặc có ý tưởng đóng góp, hãy gửi tại trang [Issues](https://github.com/thanhphong28/BreezeOS-win/issues). BreezeOS hỗ trợ cập nhật tự động ngay trong ứng dụng (*Cài đặt → Chung → Giới thiệu*).
 
 > [!IMPORTANT]
-> **Tuyên bố miễn trừ trách nhiệm.** BreezeOS là dự án độc lập, **không liên kết, không được tài trợ hay chứng nhận bởi Apple Inc. hoặc Microsoft Corporation**. BreezeOS sử dụng hệ thống tên gọi riêng (*Deck, Breeze Notch, Upper Bar, Scene, Quick Search, Quick Panel, Crystal...*) và không chứa bất kỳ mã nguồn, biểu tượng, phông chữ hay tài nguyên độc quyền nào của bên thứ ba.
+> **Tuyên bố miễn trừ trách nhiệm.** BreezeOS là dự án độc lập, **không liên kết, không được tài trợ hay chứng nhận bởi Apple Inc. hoặc Microsoft Corporation**. BreezeOS sử dụng hệ thống tên gọi riêng (*Breeze Bar, Breeze Notch, Upper Bar, Scene, Quick Search, Quick Panel, Crystal...*) và không chứa bất kỳ mã nguồn, biểu tượng, phông chữ hay tài nguyên độc quyền nào của bên thứ ba.
 
 ---
 
@@ -41,7 +41,7 @@
 
 **BreezeOS** khoác lên Windows 11 một không gian làm việc tinh gọn, hiện đại với chất liệu kính mờ (Frosted Glass & Crystal) cùng chuyển động đàn hồi mượt mà trên GPU:
 
-- **Deck** — Thanh ứng dụng nổi với hiệu ứng phóng đại khi di chuột, xem trước cửa sổ trực tiếp (live preview), ngăn xếp Tải xuống và Thùng rác kính.
+- **Breeze Bar** — Thanh ứng dụng nổi với hiệu ứng phóng đại khi di chuột, xem trước cửa sổ trực tiếp (live preview), ngăn xếp Tải xuống và Thùng rác kính.
 - **Breeze Notch & Viên nang (Capsule)** — Đảo thông tin tương tác ở cạnh trên màn hình (tùy chỉnh độc lập cả **chiều rộng** lẫn **chiều cao** theo ý thích): phát nhạc kèm lời bài hát đồng bộ thời gian thực, sóng nhạc & hiệu ứng cực quang theo bìa đĩa, theo dõi tiến trình tải xuống, kệ tệp kéo-thả, gửi tệp sang điện thoại qua mã QR, phiên tập trung (Pomodoro), công việc & lời nhắc, và nhắc lịch họp.
 - **Upper Bar** — Thanh menu phía trên cùng tích hợp logo BreezeOS, thực đơn ứng dụng thông minh (File, Edit, View...), trạng thái Wi‑Fi, pin, Tìm kiếm nhanh, Quick Panel và đồng hồ với kích thước độc lập hoàn toàn.
 - **Bảng điều khiển nhanh (Quick Panel)** — Trung tâm điều khiển dạng kính cho phép kéo-thả sắp xếp và nắm góc co giãn kích thước từng ô điều khiển.
@@ -50,16 +50,16 @@
 Toàn bộ chương trình là một tệp thực thi thuần bản địa duy nhất viết bằng **Rust**: không Electron, không WebView, không dịch vụ chạy ngầm nặng nề, không yêu cầu tài khoản. Khi ở trạng thái nghỉ, BreezeOS chỉ tiêu thụ khoảng **15 MB RAM**.
 
 <p align="center">
-  <img src="assets/screenshots/desktop.png" alt="Màn hình BreezeOS với Deck, Upper Bar, Breeze Notch và Tiện ích màn hình" width="900">
+  <img src="assets/screenshots/desktop.png" alt="Màn hình BreezeOS với Breeze Bar, Upper Bar, Breeze Notch và Tiện ích màn hình" width="900">
 </p>
 
-### 🌟 Điểm nổi bật trên phiên bản 1.0.4
+### 🌟 Điểm nổi bật trên phiên bản 1.0.5
 
 - **Tùy biến kích thước độc lập hoàn toàn**:
   - **Breeze Notch** cho phép chỉnh riêng **Chiều rộng (`60%–180%`)** và **Chiều cao (`70%–180%`)** theo đúng tỷ lệ mong muốn.
   - **Upper Bar** có thanh trượt **Kích thước Upper Bar (`70%–160%`)** hoàn toàn tách biệt, không còn bị thay đổi theo kích thước của Breeze Notch.
 - **Hỗ trợ trọn vẹn Tiếng Việt & Tiếng Anh**: Chuyển đổi tức thì tại *Cài đặt → Chung → Ngôn ngữ*. Toàn bộ giao diện, lịch, thứ/ngày/tháng, phiên tập trung, menu Upper Bar và trang gửi tệp sang điện thoại đều được bản địa hóa tự nhiên.
-- **Hỗ trợ đa màn hình thông minh**: Tùy chọn màn hình hiển thị riêng cho Deck, Upper Bar, Breeze Notch và Tiện ích (*Màn hình chính*, *Màn hình 1*, *Màn hình 2*...) với tỷ lệ DPI độc lập trên từng màn hình; tự động thu về màn hình chính khi rút cáp và khôi phục khi cắm lại.
+- **Hỗ trợ đa màn hình thông minh**: Tùy chọn màn hình hiển thị riêng cho Breeze Bar, Upper Bar, Breeze Notch và Tiện ích (*Màn hình chính*, *Màn hình 1*, *Màn hình 2*...) với tỷ lệ DPI độc lập trên từng màn hình; tự động thu về màn hình chính khi rút cáp và khôi phục khi cắm lại.
 - **Mẫu thiết lập (Presets) & Giao diện cộng đồng (`.breezetheme`)**: Đổi phong cách toàn diện chỉ với 1 cú nhấp (*Mặc định, Prism, Neon, Aurora, Stealth, Pixel*) hoặc nhập/xuất tệp giao diện `.breezetheme` an toàn.
 - **Mô-đun Capsule tùy biến**: Tự chọn và sắp xếp các thông tin hiển thị khi Breeze Notch nghỉ (lời chào, đồng hồ, ngày tháng, pin, CPU/RAM, mạng Wi‑Fi, sự kiện lịch tiếp theo) theo chế độ luân phiên hoặc song song.
 - **Phiên tập trung & Công việc nhanh**: Chu kỳ làm việc/nghỉ ngơi tự động ngay trên Breeze Notch, thống kê 7 ngày, và tạo nhanh công việc/nhắc nhở bằng phím tắt `Ctrl + Alt + N`.
@@ -77,7 +77,7 @@ Mọi thành phần của BreezeOS đều hoạt động độc lập — bạn 
 
 | Thành phần | Vị trí bật / tắt |
 |---|---|
-| **Thanh Deck** | *Cài đặt → Deck → Bật thanh Deck* |
+| **Thanh Breeze Bar** | *Cài đặt → Breeze Bar → Bật thanh Breeze Bar* |
 | **Breeze Notch** | *Cài đặt → Breeze Notch → Bật Breeze Notch* |
 | **Upper Bar** | *Cài đặt → Upper Bar → Bật Upper Bar* |
 | **Tiện ích màn hình** | Nhấp chuột phải vào tiện ích → *Xóa tiện ích* |
@@ -85,7 +85,7 @@ Mọi thành phần của BreezeOS đều hoạt động độc lập — bạn 
 | **Góc màn hình** | *Cài đặt → Góc màn hình* (đặt từng góc thành *Không có*) |
 | **Thanh tác vụ Windows** | *Cài đặt → Chung → Ẩn thanh tác vụ Windows* (tắt nếu muốn giữ Taskbar gốc) |
 | **Hoạt ảnh cửa sổ** | *Cài đặt → Chung → Hoạt ảnh cửa sổ (thu nhỏ, đóng, mở)* |
-| **Ứng dụng gần đây trên Deck** | *Cài đặt → Deck → Ứng dụng dùng gần đây* |
+| **Ứng dụng gần đây trên Breeze Bar** | *Cài đặt → Breeze Bar → Ứng dụng dùng gần đây* |
 
 ---
 
@@ -97,12 +97,12 @@ Tải bản phát hành mới nhất tại trang **[Releases](https://github.com
 
 | Tệp tải về | Khuyên dùng cho |
 |---|---|
-| `BreezeOS-Setup-1.0.4.exe` | **Đa số người dùng.** Cài đặt theo tài khoản người dùng (không cần quyền Quản trị viên / Admin), tùy chọn tạo lối tắt Start Menu và khởi động cùng Windows, hỗ trợ tự động cập nhật và gỡ cài đặt sạch qua *Cài đặt Windows → Ứng dụng*. |
-| `BreezeOS-1.0.4-win-x64.zip` | **Bản chạy ngay (Portable).** Giải nén vào bất kỳ thư mục nào và giữ `breezeos.exe`, `breezeos-guard.exe` cùng thư mục `fonts` nằm chung với nhau. |
+| `BreezeOS-Setup-1.0.5.exe` | **Đa số người dùng.** Cài đặt theo tài khoản người dùng (không cần quyền Quản trị viên / Admin), tùy chọn tạo lối tắt Start Menu và khởi động cùng Windows, hỗ trợ tự động cập nhật và gỡ cài đặt sạch qua *Cài đặt Windows → Ứng dụng*. |
+| `BreezeOS-1.0.5-win-x64.zip` | **Bản chạy ngay (Portable).** Giải nén vào bất kỳ thư mục nào và giữ `breezeos.exe`, `breezeos-guard.exe` cùng thư mục `fonts` nằm chung với nhau. |
 
 ### Cài đặt bằng bộ cài `.exe`
 
-1. Chạy `BreezeOS-Setup-1.0.4.exe`.
+1. Chạy `BreezeOS-Setup-1.0.5.exe`.
 2. Nếu Windows SmartScreen hiển thị cảnh báo ứng dụng chưa ký số thương mại, chọn **More info → Run anyway** (chỉ thực hiện với tệp tải trực tiếp từ kho lưu trữ chính thức này).
 3. Chọn tùy chọn mong muốn (tạo lối tắt Start Menu, khởi động cùng Windows) và hoàn tất.
 
@@ -113,16 +113,16 @@ Một số trình quét heuristic có thể cảnh báo nhầm do tệp thực t
 Để tự kiểm tra tính toàn vẹn của tệp cài đặt:
 
 ```powershell
-Get-FileHash .\BreezeOS-Setup-1.0.4.exe -Algorithm SHA256
+Get-FileHash .\BreezeOS-Setup-1.0.5.exe -Algorithm SHA256
 ```
 
 Đối chiếu kết quả với mã **SHA‑256** công bố trên trang Releases — hoặc bạn có thể tự biên dịch trực tiếp từ mã nguồn theo hướng dẫn bên dưới.
 
 ### Khởi chạy lần đầu & Gỡ cài đặt
 
-- **Khởi chạy lần đầu**: Taskbar mặc định sẽ ẩn đi, thay bằng **Upper Bar**, **Breeze Notch** và **Deck**. Mở **Cài đặt** bằng cách nhấp chuột phải vào vùng trống trên Deck → **Cài đặt BreezeOS…**, nhấp trái vào biểu tượng BreezeOS dưới khay hệ thống (System Tray), hoặc mở từ menu logo BreezeOS trên Upper Bar.
+- **Khởi chạy lần đầu**: Taskbar mặc định sẽ ẩn đi, thay bằng **Upper Bar**, **Breeze Notch** và **Breeze Bar**. Mở **Cài đặt** bằng cách nhấp chuột phải vào vùng trống trên Breeze Bar → **Cài đặt BreezeOS…**, nhấp trái vào biểu tượng BreezeOS dưới khay hệ thống (System Tray), hoặc mở từ menu logo BreezeOS trên Upper Bar.
 - **Đổi ngôn ngữ**: Vào *Cài đặt → Chung → Ngôn ngữ* → chọn **Vietnamese** (Tiếng Việt) hoặc **English**.
-- **Thoát an toàn**: Nhấp chuột phải vào vùng trống trên Deck hoặc nút Start → **Thoát BreezeOS**. Thanh Taskbar Windows sẽ tự động khôi phục ngay lập tức (kể cả khi tiến trình bị buộc dừng nhờ trình bảo vệ `breezeos-guard.exe`).
+- **Thoát an toàn**: Nhấp chuột phải vào vùng trống trên Breeze Bar hoặc nút Start → **Thoát BreezeOS**. Thanh Taskbar Windows sẽ tự động khôi phục ngay lập tức (kể cả khi tiến trình bị buộc dừng nhờ trình bảo vệ `breezeos-guard.exe`).
 - **Gỡ cài đặt**: Gỡ từ *Windows Settings → Apps → Installed apps → BreezeOS* (với bản Setup) hoặc thoát ứng dụng rồi xóa thư mục (với bản Portable). Xóa thêm `%APPDATA%\BreezeOS` nếu muốn xóa sạch toàn bộ cấu hình cá nhân.
 
 ---
@@ -130,14 +130,14 @@ Get-FileHash .\BreezeOS-Setup-1.0.4.exe -Algorithm SHA256
 ## 📖 Hướng dẫn sử dụng
 
 <details open>
-<summary><b>🎛 Thanh Deck</b></summary>
+<summary><b>🎛 Thanh Breeze Bar</b></summary>
 
 - **Mở & chuyển đổi ứng dụng**: Nhấp vào biểu tượng ứng dụng. Ứng dụng đang chạy có chấm sáng phía dưới; di chuột để phóng đại mượt mà và xem trước cửa sổ trực tiếp.
-- **Ghim & sắp xếp**: Nhấp chuột phải → *Ghim vào Deck* / *Gỡ khỏi Deck*, hoặc kéo thả để đổi vị trí biểu tượng.
-- **Thu nhỏ cửa sổ**: Hiệu ứng thu phễu (*Funnel*) hoặc thu phóng (*Thu phóng*) bay mượt vào Deck.
+- **Ghim & sắp xếp**: Nhấp chuột phải → *Ghim vào Breeze Bar* / *Gỡ khỏi Breeze Bar*, hoặc kéo thả để đổi vị trí biểu tượng.
+- **Thu nhỏ cửa sổ**: Hiệu ứng thu phễu (*Funnel*) hoặc thu phóng (*Thu phóng*) bay mượt vào Breeze Bar.
 - **Tiện ích tích hợp**: Nút **Bắt đầu** mang biểu tượng BreezeOS, **Lưới ứng dụng**, **Ngăn xếp Tải xuống** và **Thùng rác** (nhấp chuột phải → *Dọn sạch Thùng rác*).
 - **Biểu tượng tùy chỉnh**: Nhấp chuột phải vào bất kỳ biểu tượng nào → *Đổi biểu tượng…*.
-- **Hành vi linh hoạt**: *Cố định*, *Đè lên*, hoặc *Thông minh* (tự ẩn khi cửa sổ chiếm chỗ) trong *Cài đặt → Deck*.
+- **Hành vi linh hoạt**: *Cố định*, *Đè lên*, hoặc *Thông minh* (tự ẩn khi cửa sổ chiếm chỗ) trong *Cài đặt → Breeze Bar*.
 </details>
 
 <details open>
@@ -292,10 +292,10 @@ Sau khi build xong, hai tệp `breezeos.exe` và `breezeos-guard.exe` sẽ nằm
 cargo test --workspace
 
 winget install JRSoftware.InnoSetup                            # chỉ cần cài một lần
-powershell -File installer\build-installer.ps1 -Version 1.0.4
+powershell -File installer\build-installer.ps1 -Version 1.0.5
 ```
 
-Kịch bản đóng gói sẽ tự động xóa đường dẫn cục bộ khỏi binary, kiểm tra quyền riêng tư trên tệp `.exe` và xuất ra `dist\BreezeOS-Setup-1.0.4.exe` cùng `dist\BreezeOS-1.0.4-win-x64.zip`.
+Kịch bản đóng gói sẽ tự động xóa đường dẫn cục bộ khỏi binary, kiểm tra quyền riêng tư trên tệp `.exe` và xuất ra `dist\BreezeOS-Setup-1.0.5.exe` cùng `dist\BreezeOS-1.0.5-win-x64.zip`.
 
 ### 4. Chạy thử nghiệm cô lập an toàn
 
@@ -312,10 +312,10 @@ Các cờ dòng lệnh hữu ích: `--keep-taskbar`, `--no-dock`, `--no-island`,
 
 | Đường dẫn | Vai trò |
 |---|---|
-| `crates/core` | Logic thuần có kiểm thử đơn vị (unit tests): trạng thái Breeze Notch, lời bài hát, mã QR, bố cục Deck, tiện ích, cài đặt, đa ngôn ngữ (`En`/`Vi`), xử lý biểu tượng |
+| `crates/core` | Logic thuần có kiểm thử đơn vị (unit tests): trạng thái Breeze Notch, lời bài hát, mã QR, bố cục Breeze Bar, tiện ích, cài đặt, đa ngôn ngữ (`En`/`Vi`), xử lý biểu tượng |
 | `crates/platform` | Lớp giao tiếp Win32 / WinRT: quản lý cửa sổ, media, âm thanh, Wi‑Fi, Bluetooth, tải xuống, WIC, máy chủ gửi tệp nội bộ |
 | `crates/ui` | Chất liệu kính mờ trên `Windows.UI.Composition`, thiết bị đồ họa dùng chung và chụp cửa sổ trực tiếp |
-| `crates/app` | Ứng dụng chính `breezeos`: Deck, Breeze Notch, Upper Bar, Quick Panel, Quick Search, Scene, Widgets, Cài đặt |
+| `crates/app` | Ứng dụng chính `breezeos`: Breeze Bar, Breeze Notch, Upper Bar, Quick Panel, Quick Search, Scene, Widgets, Cài đặt |
 | `crates/guard` | Tiến trình bảo vệ `breezeos-guard` tự động khôi phục Taskbar và các cửa sổ đã dịch chuyển nếu ứng dụng dừng đột ngột |
 | `assets/` · `installer/` · `tools/` | Logo & phông chữ đi kèm, kịch bản đóng gói Inno Setup / phát hành GitHub Release và công cụ kiểm tra an toàn Taskbar |
 

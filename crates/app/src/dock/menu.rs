@@ -285,6 +285,14 @@ impl Menu {
         let _ = self.popup.panel.set_tier(t);
     }
 
+    pub fn destroy(&mut self) {
+        nacre_platform::input::end_dismiss();
+        LIVE.with(|c| *c.borrow_mut() = None);
+        unsafe {
+            let _ = DestroyWindow(self.popup.hwnd);
+        }
+    }
+
     pub fn show(&mut self, comp: &Compositor, gfx: &Gfx, items: Vec<Item>, x: i32, y: i32) -> Result<()> {
         self.show_impl(comp, gfx, items, x, y, true, false)
     }

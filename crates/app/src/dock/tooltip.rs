@@ -115,4 +115,10 @@ impl Tooltip {
             self.popup.hide();
         }
     }
+
+    pub fn destroy(&mut self) {
+        unsafe {
+            let _ = DestroyWindow(self.popup.hwnd);
+        }
+    }
 }

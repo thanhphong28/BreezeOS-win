@@ -318,6 +318,166 @@ impl std::fmt::Debug for ShortText {
     }
 }
 
+pub const HK_CTRL: u8 = 1;
+pub const HK_ALT: u8 = 2;
+pub const HK_SHIFT: u8 = 4;
+pub const HK_WIN: u8 = 8;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Hotkey {
+    pub mods: u8,
+    pub vk: u16,
+}
+
+impl Default for Hotkey {
+    fn default() -> Self {
+        Self::WIN_F
+    }
+}
+
+impl Hotkey {
+    pub const WIN_F: Hotkey = Hotkey { mods: HK_WIN, vk: 0x46 };
+
+    pub fn has_required_mod(mods: u8) -> bool {
+        mods & (HK_CTRL | HK_ALT | HK_WIN) != 0
+    }
+
+    pub fn is_modifier_vk(vk: u16) -> bool {
+        matches!(vk, 0x10..=0x12 | 0x5B | 0x5C | 0xA0..=0xA5)
+    }
+
+    pub fn key_name(vk: u16) -> Option<String> {
+        match vk {
+            0x41..=0x5A | 0x30..=0x39 => Some(String::from(vk as u8 as char)),
+            0x70..=0x87 => Some(format!("F{}", vk - 0x6F)),
+            0x20 => Some("Space".into()),
+            0x09 => Some("Tab".into()),
+            0x0D => Some("Enter".into()),
+            0xC0 => Some("`".into()),
+            0xBD => Some("-".into()),
+            0xBB => Some("=".into()),
+            0xDB => Some("[".into()),
+            0xDD => Some("]".into()),
+            0xDC => Some("\\".into()),
+            0xBA => Some(";".into()),
+            0xDE => Some("'".into()),
+            0xBC => Some(",".into()),
+            0xBE => Some(".".into()),
+            0xBF => Some("/".into()),
+            0x25 => Some("Left".into()),
+            0x26 => Some("Up".into()),
+            0x27 => Some("Right".into()),
+            0x28 => Some("Down".into()),
+            0x2D => Some("Insert".into()),
+            0x2E => Some("Delete".into()),
+            0x24 => Some("Home".into()),
+            0x23 => Some("End".into()),
+            0x21 => Some("PgUp".into()),
+            0x22 => Some("PgDn".into()),
+            _ => None,
+        }
+    }
+
+    fn vk_from_token(t: &str) -> Option<u16> {
+        let u = t.trim().to_ascii_uppercase();
+        if u.len() == 1 {
+            let b = u.as_bytes()[0];
+            if b.is_ascii_uppercase() || b.is_ascii_digit() {
+                return Some(b as u16);
+            }
+        }
+        if let Some(rest) = u.strip_prefix('F') {
+            if let Ok(n) = rest.parse::<u16>() {
+                if (1..=24).contains(&n) {
+                    return Some(0x6F + n);
+                }
+            }
+        }
+        match u.as_str() {
+            "SPACE" => Some(0x20),
+            "TAB" => Some(0x09),
+            "ENTER" | "RETURN" => Some(0x0D),
+            "`" | "BACKTICK" | "TILDE" => Some(0xC0),
+            "-" | "MINUS" => Some(0xBD),
+            "=" | "PLUS" | "EQUAL" => Some(0xBB),
+            "[" => Some(0xDB),
+            "]" => Some(0xDD),
+            "\\" => Some(0xDC),
+            ";" => Some(0xBA),
+            "'" => Some(0xDE),
+            "," => Some(0xBC),
+            "." => Some(0xBE),
+            "/" => Some(0xBF),
+            "LEFT" => Some(0x25),
+            "UP" => Some(0x26),
+            "RIGHT" => Some(0x27),
+            "DOWN" => Some(0x28),
+            "INSERT" | "INS" => Some(0x2D),
+            "DELETE" | "DEL" => Some(0x2E),
+            "HOME" => Some(0x24),
+            "END" => Some(0x23),
+            "PGUP" | "PAGEUP" => Some(0x21),
+            "PGDN" | "PAGEDOWN" => Some(0x22),
+            _ => None,
+        }
+    }
+
+    pub fn from_parts(mods: u8, vk: u16) -> Option<Hotkey> {
+        let mods = mods & (HK_CTRL | HK_ALT | HK_SHIFT | HK_WIN);
+        (Self::has_required_mod(mods) && !Self::is_modifier_vk(vk) && Self::key_name(vk).is_some()).then_some(Hotkey { mods, vk })
+    }
+
+    pub fn parse(s: &str) -> Option<Hotkey> {
+        let mut mods = 0u8;
+        let mut vk = None;
+        for part in s.split('+') {
+            let p = part.trim();
+            if p.is_empty() {
+                continue;
+            }
+            match p.to_ascii_lowercase().as_str() {
+                "win" | "super" | "meta" => mods |= HK_WIN,
+                "ctrl" | "control" => mods |= HK_CTRL,
+                "alt" | "opt" | "option" => mods |= HK_ALT,
+                "shift" => mods |= HK_SHIFT,
+                _ => {
+                    if vk.is_some() {
+                        return None;
+                    }
+                    vk = Some(Self::vk_from_token(p)?);
+                }
+            }
+        }
+        Self::from_parts(mods, vk?)
+    }
+
+    fn parts(self) -> Vec<String> {
+        let mut out = Vec::new();
+        if self.mods & HK_WIN != 0 {
+            out.push("Win".into());
+        }
+        if self.mods & HK_CTRL != 0 {
+            out.push("Ctrl".into());
+        }
+        if self.mods & HK_ALT != 0 {
+            out.push("Alt".into());
+        }
+        if self.mods & HK_SHIFT != 0 {
+            out.push("Shift".into());
+        }
+        out.push(Self::key_name(self.vk).unwrap_or_else(|| "F".into()));
+        out
+    }
+
+    pub fn label(self) -> String {
+        self.parts().join(" + ")
+    }
+
+    pub fn key(self) -> String {
+        self.parts().join("+")
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Settings {
     pub takeover: bool,
@@ -379,6 +539,8 @@ pub struct Settings {
     pub mac_shortcuts: bool,
     pub downloads_stack: bool,
     pub recent_apps: bool,
+    pub dock_preview: bool,
+    pub search_hotkey: Hotkey,
     pub icon_pack: bool,
     pub ui_scale: u8,
     pub notch_island: bool,
@@ -479,6 +641,8 @@ impl Default for Settings {
             mac_shortcuts: true,
             downloads_stack: true,
             recent_apps: true,
+            dock_preview: true,
+            search_hotkey: Hotkey::WIN_F,
             icon_pack: true,
             ui_scale: 100,
             notch_island: false,
@@ -749,6 +913,8 @@ impl Settings {
                 "pill_notices" => s.pill_notices = parse_bool(v).unwrap_or(s.pill_notices),
                 "pill_reminders" => s.pill_reminders = parse_bool(v).unwrap_or(s.pill_reminders),
                 "todo_hotkey" => s.todo_hotkey = parse_bool(v).unwrap_or(s.todo_hotkey),
+                "dock_preview" => s.dock_preview = parse_bool(v).unwrap_or(s.dock_preview),
+                "search_hotkey" => s.search_hotkey = Hotkey::parse(v).unwrap_or(s.search_hotkey),
                 "deck_screen" => s.deck_screen = Screen::parse(v).unwrap_or(s.deck_screen),
                 "rail_screen" => s.rail_screen = Screen::parse(v).unwrap_or(s.rail_screen),
                 "notch_screen" => s.notch_screen = Screen::parse(v).unwrap_or(s.notch_screen),
@@ -785,7 +951,7 @@ impl Settings {
 
     pub fn serialize(&self) -> String {
         format!(
-            "# BreezeOS settings\ntakeover={}\ndock={}\nnotch={}\nblur={}\nstyle={}\ntransparency={}\ntheme={}\nlang={}\ndock_material={}\ndock_round={}\nnotch_material={}\nnotch_round={}\nautostart={}\ndock_size={}\ndock_gap={}\ndock_zoom={}\ndock_margin={}\nanim={}\nrefraction={}\ndock_enabled={}\nnotch_enabled={}\nnotch_hover_open={}\nwin_shadow={}\nmenubar={}\nclock_24h={}\nmenubar_glass={}\nhot_tl={}\nhot_tr={}\nhot_bl={}\nhot_br={}\nstage={}\nswitcher={}\nstage_right={}\nstage_size={}\nstage_gap={}\nstage_count={}\nstage_speed={}\nstage_desktop_click={}\nstage_media={}\nstage_icons={}\nstage_titles={}\nhide_desktop_icons={}\nmenubar_style={}\ndock_plates={}\nover_fullscreen={}\nclipboard_history={}\nicon_style={}\nicon_tint={}\naccent={}\nmac_shortcuts={}\ndownloads_stack={}\nrecent_apps={}\nicon_pack={}\nmenubar_material={}\nicon_variant={}\nmin_effect={}\nnotch_idle={}\ngreet_name={}\ngreet_text={}\nlyrics_compact={}\nlyrics_online={}\nnotch_downloads={}\nnotch_send={}\nui_scale={}\nnotch_island={}\nwidget_style={}\nbattery_pct={}\nrail={}\nnotch_scale={}\nnotch_height={}\nrail_scale={}\nisland_gap={}\nupdate_check={}\nnotch_glow={}\npill_devices={}\npill_notices={}\npill_reminders={}\ntodo_hotkey={}\ndeck_screen={}\nrail_screen={}\nnotch_screen={}\nwidget_screen={}\npreset={}\nvisualizer={}\nfont={}\nreduce_motion={}\nfocus_cat={}\nfocus_mins={}\nbreak_mins={}\nfocus_name={}\nmeeting_companion={}\ncapsule={}\ncapsule_layout={}\ncapsule_decor={}\naccent_rgb={}\ndock_reveal={}\nrail_reveal={}\nnotch_reveal={}\n",
+            "# BreezeOS settings\ntakeover={}\ndock={}\nnotch={}\nblur={}\nstyle={}\ntransparency={}\ntheme={}\nlang={}\ndock_material={}\ndock_round={}\nnotch_material={}\nnotch_round={}\nautostart={}\ndock_size={}\ndock_gap={}\ndock_zoom={}\ndock_margin={}\nanim={}\nrefraction={}\ndock_enabled={}\nnotch_enabled={}\nnotch_hover_open={}\nwin_shadow={}\nmenubar={}\nclock_24h={}\nmenubar_glass={}\nhot_tl={}\nhot_tr={}\nhot_bl={}\nhot_br={}\nstage={}\nswitcher={}\nstage_right={}\nstage_size={}\nstage_gap={}\nstage_count={}\nstage_speed={}\nstage_desktop_click={}\nstage_media={}\nstage_icons={}\nstage_titles={}\nhide_desktop_icons={}\nmenubar_style={}\ndock_plates={}\nover_fullscreen={}\nclipboard_history={}\nicon_style={}\nicon_tint={}\naccent={}\nmac_shortcuts={}\ndownloads_stack={}\nrecent_apps={}\ndock_preview={}\nsearch_hotkey={}\nicon_pack={}\nmenubar_material={}\nicon_variant={}\nmin_effect={}\nnotch_idle={}\ngreet_name={}\ngreet_text={}\nlyrics_compact={}\nlyrics_online={}\nnotch_downloads={}\nnotch_send={}\nui_scale={}\nnotch_island={}\nwidget_style={}\nbattery_pct={}\nrail={}\nnotch_scale={}\nnotch_height={}\nrail_scale={}\nisland_gap={}\nupdate_check={}\nnotch_glow={}\npill_devices={}\npill_notices={}\npill_reminders={}\ntodo_hotkey={}\ndeck_screen={}\nrail_screen={}\nnotch_screen={}\nwidget_screen={}\npreset={}\nvisualizer={}\nfont={}\nreduce_motion={}\nfocus_cat={}\nfocus_mins={}\nbreak_mins={}\nfocus_name={}\nmeeting_companion={}\ncapsule={}\ncapsule_layout={}\ncapsule_decor={}\naccent_rgb={}\ndock_reveal={}\nrail_reveal={}\nnotch_reveal={}\n",
             self.takeover,
             self.dock.key(),
             self.notch.key(),
@@ -838,6 +1004,8 @@ impl Settings {
             self.mac_shortcuts,
             self.downloads_stack,
             self.recent_apps,
+            self.dock_preview,
+            self.search_hotkey.key(),
             self.icon_pack,
             self.menubar_material,
             self.icon_variant,
@@ -1169,6 +1337,25 @@ menubar_material=true
         assert!(!look(&s, true, Material::Glass).dark);
         s.theme = Theme::Auto;
         assert!(look(&s, true, Material::Glass).dark && !look(&s, false, Material::Glass).dark);
+    }
+
+    #[test]
+    fn search_hotkey_requires_ctrl_alt_or_win_and_round_trips() {
+        assert_eq!(Settings::default().search_hotkey, Hotkey::WIN_F);
+        assert_eq!(Hotkey::WIN_F.label(), "Win + F");
+        // Single keys or Shift-only combos must be rejected.
+        assert_eq!(Hotkey::parse("F"), None);
+        assert_eq!(Hotkey::parse("Space"), None);
+        assert_eq!(Hotkey::parse("Shift+F"), None);
+        assert_eq!(Hotkey::from_parts(HK_SHIFT, 0x46), None);
+        // Valid combos with Win, Ctrl, Alt (+ optional Shift) work and round-trip.
+        let hk = Hotkey::parse("Ctrl + Alt + Space").unwrap();
+        assert_eq!(hk, Hotkey { mods: HK_CTRL | HK_ALT, vk: 0x20 });
+        assert_eq!(Hotkey::parse(&hk.key()), Some(hk));
+        let s = Settings::parse("search_hotkey=Alt+K\ndock_preview=false\n");
+        assert_eq!(s.search_hotkey.label(), "Alt + K");
+        assert!(!s.dock_preview);
+        assert_eq!(Settings::parse(&s.serialize()), s);
     }
 
     #[test]

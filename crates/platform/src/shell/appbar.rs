@@ -87,6 +87,11 @@ pub fn release_bottom() {
     remove_where(|b| !b.1);
 }
 
+pub fn release_bottom_if(hwnd: HWND) {
+    let key = hwnd.0 as isize;
+    remove_where(|b| b.0 == key && !b.1);
+}
+
 pub fn release() {
     remove_where(|_| true);
 }

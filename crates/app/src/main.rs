@@ -273,6 +273,7 @@ fn main() {
         }
     }
     switcher::shutdown();
+    spotlight::shutdown();
     stage::shutdown();
     nacre_platform::clipboard::shutdown();
     macshortcuts::shutdown();

@@ -19,7 +19,7 @@ use nacre_ui::gfx::Gfx;
 use nacre_ui::glass::{GlassPanel, GlassParams, Tier};
 use nacre_ui::host::{Host, Surface};
 use menu::{Menu, MENU_CLOSE, MENU_PICK};
-use preview::{Preview, PREVIEW_CLICK, PREVIEW_ENTER, PREVIEW_LEAVE};
+use preview::{Preview, PREVIEW_CLICK, PREVIEW_CLOSE_WIN, PREVIEW_ENTER, PREVIEW_LEAVE};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicIsize, Ordering};
@@ -61,12 +61,82 @@ const TIMER_REGION: usize = 109;
 const TIMER_RECONF: usize = 110;
 const TIMER_TRASH: usize = 111;
 const TIMER_REVEAL: usize = 112;
+const TIMER_PREVIEW_REFRESH: usize = 113;
+const WM_PIN_SYNC: u32 = WM_APP + 16;
 const TRASH_POLL_MS: u32 = 4000;
 const WM_DISPLAYCHANGE: u32 = 0x007E;
 const WM_DPICHANGED: u32 = 0x02E0;
 
 static DOCK_HWND: AtomicIsize = AtomicIsize::new(0);
+static DOCKS: std::sync::Mutex<Vec<isize>> = std::sync::Mutex::new(Vec::new());
 static BUSY: AtomicBool = AtomicBool::new(false);
+
+fn all_docks() -> Vec<isize> {
+    DOCKS.lock().map(|g| g.clone()).unwrap_or_default()
+}
+
+fn dock_monitor_for(slot: Option<usize>) -> nacre_core::display::Monitor {
+    match slot {
+        Some(i) => nacre_platform::monitors::list().get(i).copied().unwrap_or_else(nacre_platform::monitors::primary),
+        None => nacre_platform::monitors::target(crate::prefs::get().deck_screen),
+    }
+}
+
+type ExtraDock = (Option<(Compositor, HWND, Option<Tier>)>, Vec<(usize, isize)>);
+
+thread_local! {
+    static EXTRA: std::cell::RefCell<ExtraDock> = const { std::cell::RefCell::new((None, Vec::new())) };
+}
+
+fn sync_extras(main: HWND) {
+    use nacre_core::display::Screen;
+    if with_dock(main, |d| d.slot.is_some()).unwrap_or(true) {
+        return;
+    }
+    let s = crate::prefs::get();
+    let main_area = nacre_platform::monitors::target(s.deck_screen).area;
+    let want: Vec<usize> = if s.dock_enabled && s.deck_screen == Screen::All {
+        nacre_platform::monitors::list().iter().enumerate().filter(|(_, m)| m.area != main_area).map(|(i, _)| i).collect()
+    } else {
+        Vec::new()
+    };
+    let (ctx, have) = EXTRA.with(|e| {
+        let e = e.borrow();
+        (e.0.clone(), e.1.clone())
+    });
+    let Some((comp, main_hwnd, glass)) = ctx else { return };
+    let mut keep: Vec<(usize, isize)> = Vec::new();
+    for (slot, h) in have {
+        if want.contains(&slot) {
+            keep.push((slot, h));
+        } else {
+            unsafe {
+                let _ = DestroyWindow(HWND(h as *mut _));
+            }
+        }
+    }
+    for slot in want {
+        if keep.iter().any(|k| k.0 == slot) {
+            continue;
+        }
+        let opts = Options { appbar: s.dock.reserves(), mode: s.dock.mode(), glass };
+        match Dock::create_on(&comp, main_hwnd, opts, Some(slot)) {
+            Ok(h) => keep.push((slot, h.0 as isize)),
+            Err(e) => log::line("dock", &format!("dock layar tambahan gagal: {e}")),
+        }
+    }
+    EXTRA.with(|e| e.borrow_mut().1 = keep);
+}
+
+fn sync_pins_except(sender: HWND) {
+    for h in all_docks() {
+        if h != sender.0 as isize {
+            unsafe {
+                let _ = PostMessageW(Some(HWND(h as *mut _)), WM_PIN_SYNC, WPARAM(0), LPARAM(0));
+            }
+        }
+    }
+}
 
 const CMD_OPEN: usize = 1;
 const CMD_PIN: usize = 2;
@@ -142,6 +212,7 @@ pub struct Dock {
     m: Metrics,
     screen: (i32, i32),
     area: nacre_core::display::Area,
+    slot: Option<usize>,
     win: (i32, i32),
     win_pos: (i32, i32),
     card_y: f32,
@@ -228,8 +299,7 @@ fn kill(hwnd: HWND, id: usize) {
 }
 
 pub fn request_appbar_resync() {
-    let h = DOCK_HWND.load(Ordering::Relaxed);
-    if h != 0 {
+    for h in all_docks() {
         unsafe {
             let _ = PostMessageW(Some(HWND(h as *mut _)), WM_APPBAR_SYNC, WPARAM(0), LPARAM(0));
         }
@@ -240,8 +310,8 @@ static PENDING_AT: std::sync::Mutex<Option<std::time::Instant>> = std::sync::Mut
 static LAST_FG: AtomicIsize = AtomicIsize::new(0);
 
 fn on_windows_changed() {
-    let h = DOCK_HWND.load(Ordering::Relaxed);
-    if h == 0 {
+    let docks = all_docks();
+    if docks.is_empty() {
         return;
     }
     let fg = tracker::external_foreground();
@@ -250,19 +320,32 @@ fn on_windows_changed() {
     let since = *g.get_or_insert_with(std::time::Instant::now);
     drop(g);
     let ms = nacre_core::visibility::settle::delay(since.elapsed().as_millis() as u64, switched);
-    timer(HWND(h as *mut _), TIMER_WINDOWS, ms as u32);
+    for h in docks {
+        timer(HWND(h as *mut _), TIMER_WINDOWS, ms as u32);
+    }
 }
 
 pub fn reveal_for(ms: u32) {
-    let h = HWND(DOCK_HWND.load(Ordering::Relaxed) as *mut _);
-    with_dock(h, |d| {
-        d.revealing = true;
-        d.update_visibility();
-        timer(d.hwnd, TIMER_REVEAL, ms);
-    });
+    for h in all_docks() {
+        with_dock(HWND(h as *mut _), |d| {
+            d.revealing = true;
+            d.update_visibility();
+            timer(d.hwnd, TIMER_REVEAL, ms);
+        });
+    }
 }
 
 pub fn icon_rect_for(hwnd: isize) -> Option<(i32, i32, i32, i32)> {
+    let win_area = nacre_platform::wins::snapshot::frame_rect(hwnd)
+        .map(|(x, y, w, h)| nacre_platform::monitors::at(x + w / 2, y + h / 2).area);
+    let docks = all_docks();
+    if let Some(area) = win_area {
+        for h in &docks {
+            if let Some(r) = with_dock(HWND(*h as *mut _), |d| (d.area == area).then(|| d.icon_rect(hwnd)).flatten()).flatten() {
+                return Some(r);
+            }
+        }
+    }
     let h = HWND(DOCK_HWND.load(Ordering::Relaxed) as *mut _);
     with_dock(h, |d| d.icon_rect(hwnd)).flatten()
 }
@@ -298,6 +381,14 @@ fn metrics_from_prefs(dpi: f32) -> Metrics {
 
 impl Dock {
     pub fn create(host: &Host, main_hwnd: HWND, opts: Options) -> windows_core::Result<HWND> {
+        let glass = opts.glass;
+        EXTRA.with(|e| e.borrow_mut().0 = Some((host.compositor.clone(), main_hwnd, glass)));
+        let hwnd = Self::create_on(&host.compositor, main_hwnd, opts, None)?;
+        sync_extras(hwnd);
+        Ok(hwnd)
+    }
+
+    fn create_on(comp: &Compositor, main_hwnd: HWND, opts: Options, slot: Option<usize>) -> windows_core::Result<HWND> {
         unsafe {
             let hi: HINSTANCE = GetModuleHandleW(None)?.into();
             let class = w!("NacreDock");
@@ -316,29 +407,31 @@ impl Dock {
                 0, 0, 400, 120,
                 None, None, Some(hi), None,
             )?;
-            let mon = nacre_platform::monitors::target(crate::prefs::get().deck_screen);
+            let mon = dock_monitor_for(slot);
             let dpi = mon.scale() * crate::prefs::ui_scale();
             let screen = mon.area.size();
             let m = metrics_from_prefs(dpi);
 
-            let surface = host.attach(hwnd, (400.0, 120.0))?;
-            let stage = host.compositor.CreateContainerVisual()?;
+            let surface = nacre_ui::host::attach(comp, hwnd, (400.0, 120.0))?;
+            let stage = comp.CreateContainerVisual()?;
             surface.root.Children()?.InsertAtTop(&stage)?;
-            let mut panel = GlassPanel::new(&host.compositor, &stage, crate::prefs::glass((10.0, 10.0), 22.0 * dpi * crate::prefs::round(crate::prefs::Role::Dock), crate::prefs::Role::Dock))?;
+            let mut panel = GlassPanel::new(comp, &stage, crate::prefs::glass((10.0, 10.0), 22.0 * dpi * crate::prefs::round(crate::prefs::Role::Dock), crate::prefs::Role::Dock))?;
             let tier = opts.glass.unwrap_or_else(|| auto_tier(&sys::conditions()));
             panel.set_tier(tier)?;
-            let content = host.compositor.CreateContainerVisual()?;
+            let content = comp.CreateContainerVisual()?;
             stage.Children()?.InsertAtTop(&content)?;
 
-            let gfx = Gfx::shared(&host.compositor)?;
+            let gfx = Gfx::shared(comp)?;
             let hw = hwnd.0 as isize;
             let px = ((m.icon * m.max_scale * 1.15) as i32).clamp(64, 256);
             let worker = icons::spawn_worker(px, move || {
                 let _ = PostMessageW(Some(HWND(hw as *mut _)), WM_ICONS, WPARAM(0), LPARAM(0));
             });
 
-            custom_icons::install();
-            nacre_platform::iconpack::configure(&paths::config_dir().join("iconpack"), crate::prefs::get().icon_pack);
+            if slot.is_none() {
+                custom_icons::install();
+                nacre_platform::iconpack::configure(&paths::config_dir().join("iconpack"), crate::prefs::get().icon_pack);
+            }
             let pins_path = paths::config_dir().join("pins.txt");
             let pins = pins::load(&pins_path);
             let recents_path = paths::config_dir().join("recents.txt");
@@ -352,26 +445,27 @@ impl Dock {
             let mut dock = Box::new(Dock {
                 hwnd,
                 main_hwnd,
-                comp: host.compositor.clone(),
+                comp: comp.clone(),
                 gfx,
                 _surface: surface,
                 stage,
-                stage_anim: spring(&host.compositor, 0.78, 150)?,
+                stage_anim: spring(comp, 0.78, 150)?,
                 panel,
                 content,
                 props: {
-                    let p = host.compositor.CreatePropertySet()?;
+                    let p = comp.CreatePropertySet()?;
                     p.InsertScalar(&HSTRING::from("cx"), -10000.0)?;
                     p.InsertScalar(&HSTRING::from("k"), 0.0)?;
                     p
                 },
-                k_anim: spring(&host.compositor, 0.72, 85)?,
+                k_anim: spring(comp, 0.72, 85)?,
                 exprs_ok: false,
                 k_on: false,
                 dpi,
                 m,
                 screen,
                 area: mon.area,
+                slot,
                 win: (400, 120),
                 win_pos: (0, 0),
                 card_y: 0.0,
@@ -430,10 +524,17 @@ impl Dock {
             let _ = dock.stage.SetOffset(Vector3 { X: 0.0, Y: dock.win.1 as f32 + 8.0, Z: 0.0 });
             let appbar = dock.opts.appbar;
             SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(dock) as isize);
-            DOCK_HWND.store(hwnd.0 as isize, Ordering::Relaxed);
+            if let Ok(mut g) = DOCKS.lock() {
+                if !g.contains(&(hwnd.0 as isize)) {
+                    g.push(hwnd.0 as isize);
+                }
+            }
+            if slot.is_none() {
+                DOCK_HWND.store(hwnd.0 as isize, Ordering::Relaxed);
+                tracker::install(on_windows_changed);
+            }
             windows::Win32::UI::Shell::DragAcceptFiles(hwnd, true);
             crate::prefs::listen(hwnd);
-            tracker::install(on_windows_changed);
             let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
             with_dock(hwnd, |d| {
                 d.animate_stage(0.0);
@@ -495,7 +596,7 @@ impl Dock {
     }
 
     fn on_reconfigure(&mut self) {
-        let mon = nacre_platform::monitors::target(crate::prefs::get().deck_screen);
+        let mon = dock_monitor_for(self.slot);
         let screen = mon.area.size();
         let dpi = mon.scale() * crate::prefs::ui_scale();
         if mon.area == self.area && (dpi - self.dpi).abs() < 0.01 {
@@ -940,7 +1041,7 @@ impl Dock {
         if self.off == s.dock_enabled {
             self.off = !s.dock_enabled;
             if self.off {
-                nacre_platform::shell::appbar::release_bottom();
+                nacre_platform::shell::appbar::release_bottom_if(self.hwnd);
             } else if self.opts.appbar {
                 self.reserve_strip();
             }
@@ -962,7 +1063,7 @@ impl Dock {
             if appbar {
                 self.reserve_strip();
             } else if was_appbar {
-                nacre_platform::shell::appbar::release_bottom();
+                nacre_platform::shell::appbar::release_bottom_if(self.hwnd);
             }
             self.sync_strip();
             self.update_visibility();
@@ -1057,10 +1158,10 @@ impl Dock {
     }
 
     fn show_preview(&mut self) {
-        let Some(slot) = self.hover else { return };
-        if self.dragging.is_some() {
+        if !crate::prefs::get().dock_preview || self.dragging.is_some() {
             return;
         }
+        let Some(slot) = self.hover else { return };
         let Some(Entry::App(i)) = self.entries.get(slot).copied() else { return };
         let Some(it) = self.items.get(i) else { return };
         if !it.running() {
@@ -1265,6 +1366,7 @@ impl Dock {
             if let Err(e) = pins::save(&self.pins_path, &self.pins) {
                 log::line("pins", &format!("simpan gagal: {e}"));
             }
+            sync_pins_except(self.hwnd);
         }
         log::line("dock", &format!("drag selesai dari={from} atas={dropped_above} berubah={changed}"));
         self.signature.clear();
@@ -1464,6 +1566,7 @@ impl Dock {
             if let Err(e) = pins::save(&self.pins_path, &self.pins) {
                 log::line("pins", &format!("simpan gagal: {e}"));
             }
+            sync_pins_except(self.hwnd);
         }
     }
 
@@ -1556,6 +1659,7 @@ impl Dock {
         if let Err(e) = pins::save(&self.pins_path, &self.pins) {
             log::line("pins", &format!("simpan gagal: {e}"));
         }
+        sync_pins_except(self.hwnd);
         self.signature.clear();
         self.refresh_windows();
     }
@@ -1614,6 +1718,7 @@ impl Dock {
                     if let Err(e) = pins::save(&self.pins_path, &self.pins) {
                         log::line("pins", &format!("simpan gagal: {e}"));
                     }
+                    sync_pins_except(self.hwnd);
                     self.signature.clear();
                     self.refresh_windows();
                 }
@@ -1654,6 +1759,7 @@ impl Dock {
                         self.reload_icon(key);
                         self.signature.clear();
                         self.refresh_windows();
+                        sync_pins_except(self.hwnd);
                     } else {
                         log::line("dock", "gambar ikon tidak valid");
                     }
@@ -1665,6 +1771,7 @@ impl Dock {
                 self.surfaces.remove(key);
                 self.signature.clear();
                 self.refresh_windows();
+                sync_pins_except(self.hwnd);
             }
             CMD_ICON => {
                 if let Some(it) = &info.item {
@@ -1675,6 +1782,7 @@ impl Dock {
                     if let Some(img) = picked {
                         if custom_icons::set(&it.path, &img) {
                             self.reload_icon(&it.path);
+                            sync_pins_except(self.hwnd);
                         } else {
                             log::line("dock", "gambar ikon tidak valid");
                         }
@@ -1685,6 +1793,7 @@ impl Dock {
                 if let Some(it) = &info.item {
                     custom_icons::reset(&it.path);
                     self.reload_icon(&it.path);
+                    sync_pins_except(self.hwnd);
                 }
             }
             CMD_QUIT => unsafe {
@@ -1705,6 +1814,24 @@ impl Dock {
             }
             TIMER_TIP => self.show_tooltip(),
             TIMER_PREVIEW => self.show_preview(),
+            TIMER_PREVIEW_REFRESH => {
+                self.refresh_windows();
+                if self.preview.as_ref().is_some_and(|p| p.is_visible()) {
+                    let still_running = self
+                        .hover
+                        .and_then(|s| self.entries.get(s).copied())
+                        .and_then(|e| match e {
+                            Entry::App(i) => self.items.get(i),
+                            _ => None,
+                        })
+                        .is_some_and(|it| it.running());
+                    if still_running {
+                        self.show_preview();
+                    } else {
+                        self.hide_popups();
+                    }
+                }
+            }
             TIMER_GRACE => {
                 self.grace = false;
                 self.update_visibility();
@@ -1769,14 +1896,20 @@ impl Dock {
         }
     }
 
-    fn on_preview_click(&mut self, x: i32) {
-        let target = self.preview.as_ref().and_then(|p| p.hit(x));
-        if let Some(h) = target {
-            let ok = self.activate_target(h);
-            log::line("dock", &format!("pratinjau → aktifkan hwnd={h} ok={ok}"));
+    fn on_preview_click(&mut self, target: isize) {
+        if target != 0 {
+            let ok = self.activate_target(target);
+            log::line("dock", &format!("pratinjau → aktifkan hwnd={target} ok={ok}"));
         }
         self.hide_popups();
         self.start_grace();
+    }
+
+    fn on_preview_close(&mut self, target: isize) {
+        if target != 0 {
+            focus::request_close(target);
+            timer(self.hwnd, TIMER_PREVIEW_REFRESH, 140);
+        }
     }
 }
 
@@ -1858,6 +1991,24 @@ unsafe extern "system" fn proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> 
         }
         WM_TIMER => {
             with_dock(hwnd, |d| d.on_timer(wp.0));
+            if wp.0 == TIMER_RECONF {
+                sync_extras(hwnd);
+            }
+            LRESULT(0)
+        }
+        WM_PIN_SYNC => {
+            with_dock(hwnd, |d| {
+                d.pins = pins::load(&d.pins_path);
+                d.recents = pins::load(&d.recents_path)
+                    .into_iter()
+                    .filter(|r| r.path.to_ascii_lowercase().starts_with("shell:") || std::path::Path::new(&r.path).exists())
+                    .take(RECENTS_KEEP)
+                    .collect();
+                d.surfaces.clear();
+                d.requested.clear();
+                d.signature.clear();
+                d.refresh_windows();
+            });
             LRESULT(0)
         }
         WM_ICONS => {
@@ -1875,9 +2026,16 @@ unsafe extern "system" fn proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> 
         }
         crate::prefs::WM_PREFS => {
             with_dock(hwnd, |d| {
+                if !crate::prefs::get().dock_preview {
+                    if let Some(p) = d.preview.as_mut() {
+                        p.hide();
+                    }
+                    d.preview_hover = false;
+                }
                 d.apply_prefs();
                 d.on_reconfigure();
             });
+            sync_extras(hwnd);
             LRESULT(0)
         }
         STRIP_ENTER => {
@@ -1903,8 +2061,11 @@ unsafe extern "system" fn proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> 
             LRESULT(0)
         }
         PREVIEW_CLICK => {
-            let x = wp.0 as isize as i32;
-            with_dock(hwnd, |d| d.on_preview_click(x));
+            with_dock(hwnd, |d| d.on_preview_click(wp.0 as isize));
+            LRESULT(0)
+        }
+        PREVIEW_CLOSE_WIN => {
+            with_dock(hwnd, |d| d.on_preview_close(wp.0 as isize));
             LRESULT(0)
         }
         WM_DISPLAYCHANGE | WM_DPICHANGED => {
@@ -1916,9 +2077,31 @@ unsafe extern "system" fn proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> 
             DefWindowProcW(hwnd, msg, wp, lp)
         }
         WM_DESTROY => {
-            nacre_platform::shell::appbar::release();
-            DOCK_HWND.store(0, Ordering::Relaxed);
+            nacre_platform::shell::appbar::release_bottom_if(hwnd);
+            if let Ok(mut g) = DOCKS.lock() {
+                g.retain(|h| *h != hwnd.0 as isize);
+            }
+            if DOCK_HWND.load(Ordering::Relaxed) == hwnd.0 as isize {
+                DOCK_HWND.store(0, Ordering::Relaxed);
+            }
             LRESULT(0)
+        }
+        WM_NCDESTROY => {
+            let p = SetWindowLongPtrW(hwnd, GWLP_USERDATA, 0) as *mut Dock;
+            if !p.is_null() {
+                let mut b = Box::from_raw(p);
+                if let Some(mut t) = b.tooltip.take() {
+                    t.destroy();
+                }
+                if let Some(mut pr) = b.preview.take() {
+                    pr.destroy();
+                }
+                if let Some(mut m) = b.menu.take() {
+                    m.destroy();
+                }
+                drop(b);
+            }
+            DefWindowProcW(hwnd, msg, wp, lp)
         }
         _ => DefWindowProcW(hwnd, msg, wp, lp),
     }

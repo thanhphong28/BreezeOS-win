@@ -55,7 +55,7 @@ pub enum Screen {
     #[default]
     Primary,
     Nth(u8),
-    /// One instance on every monitor (only Breeze Notch and Upper Bar honor it; others fall back to Primary).
+    /// One instance on every monitor (honored by Breeze Bar, Breeze Notch, and Upper Bar; Widgets falls back to Primary).
     All,
 }
 

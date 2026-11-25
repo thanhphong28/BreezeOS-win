@@ -159,6 +159,9 @@ enum Action {
     WidgetStyle(u8),
     WidgetGallery,
     BatteryPct(u8),
+    DockPreview,
+    RecordSearchKey,
+    ResetSearchKey,
 }
 
 struct Region {
@@ -181,6 +184,7 @@ enum RowDef {
     Text(&'static str, String, String, u8),
     Order(&'static str, bool, u8, bool, bool),
     Theme(String, String, u8, Option<Action>),
+    Shortcut(&'static str, String, bool, bool),
 }
 
 #[derive(Clone, Copy)]
@@ -195,7 +199,7 @@ const ACCENT_NAMES: [&str; 9] = ["Multiwarna", "Biru", "Ungu", "Merah Muda", "Me
 
 fn row_label(r: &RowDef) -> &'static str {
     match r {
-        RowDef::Toggle(l, ..) | RowDef::Seg(l, ..) | RowDef::Slider(l, ..) | RowDef::Pick(l, ..) | RowDef::Swatches(l, ..) | RowDef::Thumbs(l, ..) | RowDef::Text(l, ..) | RowDef::Order(l, ..) => l,
+        RowDef::Toggle(l, ..) | RowDef::Seg(l, ..) | RowDef::Slider(l, ..) | RowDef::Pick(l, ..) | RowDef::Swatches(l, ..) | RowDef::Thumbs(l, ..) | RowDef::Text(l, ..) | RowDef::Order(l, ..) | RowDef::Shortcut(l, ..) => l,
         RowDef::Radios(..) | RowDef::Theme(..) => "",
     }
 }
@@ -227,8 +231,8 @@ fn screen_row(part: u8, cur: nacre_core::display::Screen) -> Option<RowDef> {
         opts.push((prefs::tr(n), Action::Screen(part, Screen::Nth(i as u8 + 1))));
     }
     let screens = opts.len() - 1;
-    // Only Breeze Notch (2) and Upper Bar (1) can be shown on every monitor at once.
-    if part == 1 || part == 2 {
+    // Breeze Bar (0), Upper Bar (1), and Breeze Notch (2) can all be shown on every monitor at once.
+    if part == 0 || part == 1 || part == 2 {
         opts.push((prefs::tr("Semua"), Action::Screen(part, Screen::All)));
     }
     let sel = match cur {
@@ -273,6 +277,7 @@ struct Win {
     thumbs: HashMap<String, CompositionDrawingSurface>,
     edit: Option<u8>,
     edit_buf: String,
+    rec_hotkey: bool,
     frame: Option<windows::UI::Composition::SpriteVisual>,
     frame_key: (i32, i32, bool),
 }
@@ -308,7 +313,7 @@ fn create(comp: &Compositor) -> windows_core::Result<()> {
     };
     let _ = popup.panel.set_tier(tier);
     let _ = popup.panel.set_radius(24.0 * dpi);
-    let mut win = Box::new(Win { popup, gfx, comp: comp.clone(), dpi, size: (0.0, 0.0), regions: vec![], cache: HashMap::new(), dragging: None, side: vec![], side_hover: None, side_scroll: 0.0, side_view: (0.0, 0.0), side_bar: None, side_drag: None, press: None, tab: 0, scroll: 0.0, content_h: 0.0, history: vec![0], hpos: 0, search: String::new(), search_focus: false, thumbs: HashMap::new(), edit: None, edit_buf: String::new(), frame: None, frame_key: (0, 0, false) });
+    let mut win = Box::new(Win { popup, gfx, comp: comp.clone(), dpi, size: (0.0, 0.0), regions: vec![], cache: HashMap::new(), dragging: None, side: vec![], side_hover: None, side_scroll: 0.0, side_view: (0.0, 0.0), side_bar: None, side_drag: None, press: None, tab: 0, scroll: 0.0, content_h: 0.0, history: vec![0], hpos: 0, search: String::new(), search_focus: false, thumbs: HashMap::new(), edit: None, edit_buf: String::new(), rec_hotkey: false, frame: None, frame_key: (0, 0, false) });
     if let Some(t) = std::env::var("NACRE_TEST_PAGE").ok().and_then(|v| v.parse::<u8>().ok()) {
         win.tab = t;
         win.history = vec![t];
@@ -810,6 +815,27 @@ impl Win {
                     self.text(c, "\u{2303}", bx + vw - 14.0 * d, by + (bh - 16.0 * d) / 2.0, 10.0, 600, look.fg, 0.6, 1);
                     self.region(x0, y, cw, rh, *act);
                 }
+                RowDef::Shortcut(label, value, recording, can_reset) => {
+                    self.text(c, label, lx, y + (rh - 17.0 * d) / 2.0, 13.5, 400, look.fg, 0.95, 0);
+                    let bh = 26.0 * d;
+                    let by = y + (rh - bh) / 2.0;
+                    let mut right_edge = rx;
+                    if *can_reset && !*recording {
+                        let rs = bh;
+                        let rx0 = rx - rs;
+                        self.rect(c, rx0, by, rs, rs, rs / 2.0, col(look.fg, 28));
+                        self.text(c, "\u{21BA}", rx0 + rs / 2.0, by + (rs - 16.0 * d) / 2.0 - 1.0, 13.0, 600, look.fg, 0.85, 1);
+                        self.region(rx0 - 2.0 * d, y, rs + 4.0 * d, rh, Action::ResetSearchKey);
+                        right_edge = rx0 - 8.0 * d;
+                    }
+                    let shown = if *recording { prefs::tr("Tekan Ctrl / Alt / Win + tombol…") } else { value.as_str() };
+                    let vw = (measure(shown, &Style { px: (12.5 * d).round() as i32, weight: 600 }).0 as f32 + 28.0 * d).max(96.0 * d);
+                    let bx = right_edge - vw;
+                    self.rect(c, bx, by, vw, bh, bh / 2.0, if *recording { col(accent, 230) } else { col(look.fg, 30) });
+                    let fg = if *recording { [255, 255, 255] } else { look.fg };
+                    self.text(c, shown, bx + vw / 2.0, by + (bh - 16.0 * d) / 2.0 - 1.0, 12.5, 600, fg, 1.0, 1);
+                    self.region(bx, y, vw, rh, Action::RecordSearchKey);
+                }
             }
             y += rh;
         }
@@ -950,6 +976,7 @@ impl Win {
                     vec![
                         RowDef::Toggle(prefs::tr("Aktifkan Deck"), s.dock_enabled, Action::DockOn),
                         RowDef::Seg(prefs::tr("Perilaku"), behaviors(true), beh_idx(s.dock)),
+                        RowDef::Toggle(prefs::tr("Pratinjau jendela saat hover"), s.dock_preview, Action::DockPreview),
                         RowDef::Seg(prefs::tr("Efek minimize"), vec![(prefs::tr("Funnel"), Action::MinEffect(0)), (prefs::tr("Skala"), Action::MinEffect(1))], s.min_effect as usize),
                         RowDef::Toggle(prefs::tr("Ikon seragam (squircle)"), s.dock_plates, Action::DockPlates),
                         RowDef::Toggle(prefs::tr("Tumpukan Unduhan"), s.downloads_stack, Action::DownloadsStack),
@@ -1256,7 +1283,18 @@ impl Win {
                     RowDef::Pick(prefs::tr("Widget desktop"), prefs::tr("Tambah widget").to_string(), Action::WidgetGallery),
                 ],
             )],
-            _ => vec![(None, vec![RowDef::Toggle(prefs::tr("Riwayat Papan Klip di Quick Search"), s.clipboard_history, Action::ClipHistory)])],
+            _ => vec![(
+                None,
+                vec![
+                    RowDef::Shortcut(
+                        prefs::tr("Pintasan Quick Search"),
+                        s.search_hotkey.label(),
+                        self.rec_hotkey,
+                        s.search_hotkey != nacre_core::settings::Hotkey::WIN_F,
+                    ),
+                    RowDef::Toggle(prefs::tr("Riwayat Papan Klip di Quick Search"), s.clipboard_history, Action::ClipHistory),
+                ],
+            )],
         }
     }
 
@@ -1761,6 +1799,15 @@ unsafe extern "system" fn proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> 
                     }
                 });
             }
+            if !matches!(act, Some(Action::RecordSearchKey)) {
+                with_win(|w| {
+                    if w.rec_hotkey {
+                        w.rec_hotkey = false;
+                        crate::spotlight::set_recording_target(0);
+                        w.render();
+                    }
+                });
+            }
             match act {
                 Some(Action::EditText(f)) => {
                     with_win(|w| {
@@ -1926,6 +1973,23 @@ unsafe extern "system" fn proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> 
                 }),
                 Some(Action::IconTint(i)) => prefs::update(|s| s.icon_tint = i),
                 Some(Action::ClipHistory) => prefs::update(|s| s.clipboard_history = !s.clipboard_history),
+                Some(Action::DockPreview) => prefs::update(|s| s.dock_preview = !s.dock_preview),
+                Some(Action::RecordSearchKey) => {
+                    with_win(|w| {
+                        w.rec_hotkey = !w.rec_hotkey;
+                        crate::spotlight::set_recording_target(if w.rec_hotkey { hwnd.0 as isize } else { 0 });
+                        w.render();
+                    });
+                    let _ = SetForegroundWindow(hwnd);
+                    let _ = SetFocus(Some(hwnd));
+                }
+                Some(Action::ResetSearchKey) => {
+                    with_win(|w| {
+                        w.rec_hotkey = false;
+                    });
+                    crate::spotlight::set_recording_target(0);
+                    prefs::update(|s| s.search_hotkey = nacre_core::settings::Hotkey::WIN_F);
+                }
                 Some(Action::AboveFull) => prefs::update(|s| s.above_fullscreen = !s.above_fullscreen),
                 Some(Action::DockPlates) => prefs::update(|s| s.dock_plates = !s.dock_plates),
                 Some(Action::IconPack) => prefs::update(|s| s.icon_pack = !s.icon_pack),
@@ -1976,11 +2040,32 @@ unsafe extern "system" fn proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> 
             });
             LRESULT(0)
         }
+        m if m == crate::spotlight::WM_HK_RECORDED => {
+            if wp.0 == 0 {
+                with_win(|w| {
+                    w.rec_hotkey = false;
+                    w.render();
+                });
+                crate::spotlight::set_recording_target(0);
+            } else if wp.0 != usize::MAX {
+                let mods = ((wp.0 >> 16) & 0xFF) as u8;
+                let vk = (wp.0 & 0xFFFF) as u16;
+                if let Some(hk) = nacre_core::settings::Hotkey::from_parts(mods, vk) {
+                    with_win(|w| {
+                        w.rec_hotkey = false;
+                    });
+                    crate::spotlight::set_recording_target(0);
+                    prefs::update(|s| s.search_hotkey = hk);
+                }
+            }
+            LRESULT(0)
+        }
         WM_CLOSE => {
             let _ = PostMessageW(Some(hwnd), WM_CLOSE_SELF, WPARAM(0), LPARAM(0));
             LRESULT(0)
         }
         WM_CLOSE_SELF => {
+            crate::spotlight::set_recording_target(0);
             prefs::unlisten(hwnd);
             let win = WIN.with(|s| s.borrow_mut().take());
             drop(win);
