@@ -55,6 +55,8 @@ pub enum Screen {
     #[default]
     Primary,
     Nth(u8),
+    /// One instance on every monitor (only Breeze Notch and Upper Bar honor it; others fall back to Primary).
+    All,
 }
 
 pub const MAX_SCREENS: u8 = 4;
@@ -63,6 +65,7 @@ impl Screen {
     pub fn parse(s: &str) -> Option<Screen> {
         match s.trim().to_ascii_lowercase().as_str() {
             "primary" | "utama" | "main" => Some(Screen::Primary),
+            "all" | "semua" => Some(Screen::All),
             v => v.parse::<u8>().ok().filter(|n| (1..=MAX_SCREENS).contains(n)).map(Screen::Nth),
         }
     }
@@ -70,6 +73,7 @@ impl Screen {
     pub fn key(self) -> &'static str {
         match self {
             Screen::Primary => "primary",
+            Screen::All => "all",
             Screen::Nth(1) => "1",
             Screen::Nth(2) => "2",
             Screen::Nth(3) => "3",
@@ -89,7 +93,7 @@ pub fn primary(list: &[Monitor]) -> Option<Monitor> {
 
 pub fn resolve(screen: Screen, list: &[Monitor]) -> Option<Monitor> {
     match screen {
-        Screen::Primary => primary(list),
+        Screen::Primary | Screen::All => primary(list),
         Screen::Nth(n) => ordered(list.to_vec()).get(n as usize - 1).copied().or_else(|| primary(list)),
     }
 }
@@ -132,7 +136,9 @@ mod tests {
 
     #[test]
     fn screen_keys_round_trip() {
-        for s in [Screen::Primary, Screen::Nth(1), Screen::Nth(2), Screen::Nth(3), Screen::Nth(4)] {
+        assert_eq!(Screen::parse("all"), Some(Screen::All));
+        assert_eq!(resolve(Screen::All, &[Monitor { area: Area::new(0, 0, 10, 10), work: Area::new(0, 0, 10, 10), dpi: 96, primary: true }]).unwrap().area.x, 0);
+        for s in [Screen::Primary, Screen::All, Screen::Nth(1), Screen::Nth(2), Screen::Nth(3), Screen::Nth(4)] {
             assert_eq!(Screen::parse(s.key()), Some(s));
         }
         assert_eq!(Screen::parse("utama"), Some(Screen::Primary));

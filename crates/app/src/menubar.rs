@@ -37,10 +37,9 @@ const T_EDGE: usize = 6;
 const WM_RAIL_EDGE: u32 = WM_APP + 76;
 static RAIL_SMART: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 static RAIL_EDGE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
-static RAIL_ZONE: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(40);
-static RAIL_TOP: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(0);
-static RAIL_L: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(i32::MIN);
-static RAIL_R: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(i32::MAX);
+// (hwnd, left, right, top, zone height) of every Upper Bar, used by the mouse hook for Smart reveal.
+static RAIL_ZONES: std::sync::Mutex<Vec<(isize, i32, i32, i32, i32)>> = std::sync::Mutex::new(Vec::new());
+static RAIL_EDGE_WHO: std::sync::atomic::AtomicIsize = std::sync::atomic::AtomicIsize::new(0);
 const BAR_W: i32 = 600;
 const APP_W: i32 = 800;
 
@@ -91,6 +90,7 @@ struct Bar {
     fullscreen: bool,
     edge: bool,
     smart_hidden: bool,
+    slot: Option<usize>,
 }
 
 struct Ctl {
@@ -99,16 +99,26 @@ struct Ctl {
 }
 
 thread_local! {
-    static BAR: RefCell<Option<Box<Bar>>> = const { RefCell::new(None) };
+    static BAR: RefCell<Vec<Box<Bar>>> = const { RefCell::new(Vec::new()) };
     static CTL: RefCell<Option<Ctl>> = const { RefCell::new(None) };
 }
 
-fn with_bar<R>(f: impl FnOnce(&mut Bar) -> R) -> Option<R> {
-    BAR.with(|c| c.try_borrow_mut().ok().and_then(|mut b| b.as_mut().map(|b| f(b))))
+fn with_bar_at<R>(hwnd: HWND, f: impl FnOnce(&mut Bar) -> R) -> Option<R> {
+    BAR.with(|c| c.try_borrow_mut().ok().and_then(|mut v| v.iter_mut().find(|b| b.popup.hwnd == hwnd).map(|b| f(b))))
+}
+
+fn each_bar(mut f: impl FnMut(&mut Bar)) {
+    BAR.with(|c| {
+        if let Ok(mut v) = c.try_borrow_mut() {
+            for b in v.iter_mut() {
+                f(b);
+            }
+        }
+    });
 }
 
 pub fn refresh_radios() {
-    with_bar(|b| {
+    each_bar(|b| {
         if let Some(r) = &b.radios {
             let _ = r.commands.send(radio::Cmd::Refresh);
         }
@@ -146,11 +156,19 @@ unsafe extern "system" fn ll_mouse(code: i32, wp: WPARAM, lp: LPARAM) -> LRESULT
         if m == WM_MOUSEMOVE && RAIL_SMART.load(std::sync::atomic::Ordering::Relaxed) {
             let pt = (*(lp.0 as *const MSLLHOOKSTRUCT)).pt;
             let o = std::sync::atomic::Ordering::Relaxed;
-            let inside = pt.x >= RAIL_L.load(o) && pt.x < RAIL_R.load(o);
-            let y = pt.y - RAIL_TOP.load(o);
+            let (who, y, zone) = RAIL_ZONES
+                .lock()
+                .ok()
+                .and_then(|z| z.iter().find(|e| pt.x >= e.1 && pt.x < e.2).map(|e| (e.0, pt.y - e.3, e.4)))
+                .unwrap_or((0, 0, 0));
+            let inside = who != 0;
             let was = RAIL_EDGE.load(o);
-            let now = if inside && y <= 1 { true } else if !inside || y > RAIL_ZONE.load(o) { false } else { was };
-            if now != was {
+            let was_here = was && RAIL_EDGE_WHO.load(o) == who;
+            let now = if inside && y <= 1 { true } else if !inside || y > zone { false } else { was_here };
+            if now != was || (now && !was_here) {
+                if now {
+                    RAIL_EDGE_WHO.store(who, o);
+                }
                 RAIL_EDGE.store(now, std::sync::atomic::Ordering::Relaxed);
                 let ctl = BAR_CTL.load(std::sync::atomic::Ordering::Relaxed);
                 if ctl != 0 {
@@ -195,6 +213,27 @@ fn rail_monitor() -> nacre_core::display::Monitor {
     nacre_platform::monitors::target(prefs::get().rail_screen)
 }
 
+// slot None = main bar (follows the setting; "All" resolves to primary); Some(i) = extra bar pinned to monitor i.
+fn bar_monitor(slot: Option<usize>) -> nacre_core::display::Monitor {
+    match slot {
+        Some(i) => nacre_platform::monitors::list().get(i).copied().unwrap_or_else(nacre_platform::monitors::primary),
+        None => rail_monitor(),
+    }
+}
+
+fn bar_slots() -> Vec<Option<usize>> {
+    let mut v = vec![None];
+    if prefs::get().rail_screen == nacre_core::display::Screen::All {
+        let main = rail_monitor().area;
+        for (i, m) in nacre_platform::monitors::list().iter().enumerate() {
+            if m.area != main {
+                v.push(Some(i));
+            }
+        }
+    }
+    v
+}
+
 fn rail_dpi(mon: &nacre_core::display::Monitor) -> f32 {
     mon.scale() * prefs::ui_scale() * prefs::get().rail_scale as f32 / 100.0
 }
@@ -216,80 +255,94 @@ pub fn init(comp: &Compositor) -> windows_core::Result<()> {
     Ok(())
 }
 
-fn apply_prefs() {
-    let want = prefs::get().menubar;
-    let have = BAR.with(|c| c.borrow().is_some());
-    if want && !have {
-        let comp = CTL.with(|c| c.borrow().as_ref().map(|c| c.comp.clone()));
-        if let Some(comp) = comp {
-            match create(&comp) {
-                Ok(b) => {
-                    let hwnd = b.popup.hwnd;
-                    BAR.with(|c| *c.borrow_mut() = Some(b));
-                    services::register_bar(hwnd);
-                    with_bar(|b| {
-                        b.refresh_app();
-                        b.relayout();
-                        b.render();
-                        b.sync_behavior();
-                    });
-                    services::post_island(WM_APP + 72);
-                    CTL.with(|c| {
-                        if let Some(ctl) = c.borrow().as_ref() {
-                            unsafe {
-                                SetTimer(Some(ctl.hwnd), T_APP, 900, None);
-                            }
-                        }
-                    });
-                    log::line("menubar", "dibuat");
-                    crate::hotcorners::raise();
-                }
-                Err(e) => log::line("menubar", &format!("gagal: {e}")),
-            }
-        }
-    } else if !want && have {
-        let b = BAR.with(|c| c.borrow_mut().take());
-        if let Some(b) = b {
-            b.menu.hide();
-            shell::appbar::release_top_if(b.popup.hwnd);
-            unsafe {
-                let _ = DestroyWindow(b.popup.hwnd);
-            }
-        }
-        services::set_rail_area(None);
-        log::line("menubar", "dihancurkan");
-        services::post_island(crate::prefs::WM_PREFS);
-    } else if want {
-        let moved = with_bar(|b| rail_monitor().area != b.area).unwrap_or(false);
-        if moved {
-            let b = BAR.with(|c| c.borrow_mut().take());
-            if let Some(b) = b {
-                b.menu.hide();
-                shell::appbar::release_top_if(b.popup.hwnd);
-                unsafe {
-                    let _ = DestroyWindow(b.popup.hwnd);
-                }
-            }
-            apply_prefs();
-            return;
-        }
-        with_bar(|b| {
-            let want_dpi = rail_dpi(&rail_monitor());
-            if (want_dpi - b.dpi).abs() > 0.005 {
-                b.dpi = want_dpi;
-                b.menu.set_dpi(want_dpi);
-                b.cache.clear();
-            }
-            b.apply_look();
-            b.relayout();
-            b.render();
-            b.sync_behavior();
-        });
+fn destroy_bar(b: Box<Bar>) {
+    b.menu.hide();
+    let h = b.popup.hwnd;
+    shell::appbar::release_top_if(h);
+    services::unregister_bar(h);
+    if let Ok(mut z) = RAIL_ZONES.lock() {
+        z.retain(|e| e.0 != h.0 as isize);
+    }
+    unsafe {
+        let _ = DestroyWindow(h);
     }
 }
 
-fn create(comp: &Compositor) -> windows_core::Result<Box<Bar>> {
-    let mon = rail_monitor();
+fn apply_prefs() {
+    let want = prefs::get().menubar;
+    let slots = if want { bar_slots() } else { Vec::new() };
+    // Drop bars that are no longer wanted or whose monitor changed; they are recreated below.
+    let stale: Vec<Box<Bar>> = BAR.with(|c| {
+        let mut v = c.borrow_mut();
+        let mut out = Vec::new();
+        let mut i = 0;
+        while i < v.len() {
+            if slots.contains(&v[i].slot) && bar_monitor(v[i].slot).area == v[i].area {
+                i += 1;
+            } else {
+                out.push(v.remove(i));
+            }
+        }
+        out
+    });
+    let removed = !stale.is_empty();
+    for b in stale {
+        destroy_bar(b);
+    }
+    if !want {
+        if removed {
+            services::set_rail_area(None);
+            log::line("menubar", "dihancurkan");
+            services::post_island(crate::prefs::WM_PREFS);
+        }
+        return;
+    }
+    for slot in slots {
+        if BAR.with(|c| c.borrow().iter().any(|b| b.slot == slot)) {
+            continue;
+        }
+        let comp = CTL.with(|c| c.borrow().as_ref().map(|c| c.comp.clone()));
+        let Some(comp) = comp else { return };
+        match create(&comp, slot) {
+            Ok(b) => {
+                let hwnd = b.popup.hwnd;
+                BAR.with(|c| c.borrow_mut().push(b));
+                services::register_bar(hwnd);
+                with_bar_at(hwnd, |b| {
+                    b.refresh_app();
+                    b.relayout();
+                    b.render();
+                    b.sync_behavior();
+                });
+                services::post_island(WM_APP + 72);
+                CTL.with(|c| {
+                    if let Some(ctl) = c.borrow().as_ref() {
+                        unsafe {
+                            SetTimer(Some(ctl.hwnd), T_APP, 900, None);
+                        }
+                    }
+                });
+                log::line("menubar", "dibuat");
+                crate::hotcorners::raise();
+            }
+            Err(e) => log::line("menubar", &format!("gagal: {e}")),
+        }
+    }
+    each_bar(|b| {
+        let want_dpi = rail_dpi(&bar_monitor(b.slot));
+        if (want_dpi - b.dpi).abs() > 0.005 {
+            b.dpi = want_dpi;
+            b.menu.set_dpi(want_dpi);
+            b.cache.clear();
+        }
+        b.apply_look();
+        b.relayout();
+        b.render();
+        b.sync_behavior();
+    });
+}
+fn create(comp: &Compositor, slot: Option<usize>) -> windows_core::Result<Box<Bar>> {
+    let mon = bar_monitor(slot);
     let area = mon.area;
     let screen = area.size();
     let glass = prefs::apply(nacre_ui::glass::GlassParams::dark((10.0, 10.0), 0.0), &prefs::bar_look());
@@ -385,6 +438,7 @@ fn create(comp: &Compositor) -> windows_core::Result<Box<Bar>> {
         fullscreen: false,
         edge: false,
         smart_hidden: false,
+        slot,
     });
     bar.apply_bg();
     Ok(bar)
@@ -409,7 +463,7 @@ unsafe extern "system" fn ctl_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
             GetWindowThreadProcessId(HWND(root as *mut _), Some(&mut pid));
             let shell = matches!(cls.as_str(), "Progman" | "WorkerW" | "Shell_TrayWnd" | "Shell_SecondaryTrayWnd" | "NotifyIconOverflowWindow" | "TopLevelWindowForOverflowXamlIsland");
             if pid != std::process::id() && !shell {
-                with_bar(|b| {
+                each_bar(|b| {
                     if b.refresh_app_for(root) {
                         b.relayout();
                         b.render();
@@ -423,7 +477,7 @@ unsafe extern "system" fn ctl_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                 SetTimer(Some(hwnd), T_EDGE, prefs::get().rail_reveal.rail_ms(), None);
             } else {
                 let _ = KillTimer(Some(hwnd), T_EDGE);
-                with_bar(|b| {
+                each_bar(|b| {
                     b.edge = false;
                     b.apply_visibility();
                 });
@@ -432,15 +486,17 @@ unsafe extern "system" fn ctl_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
         }
         WM_TIMER if wp.0 == T_EDGE => {
             let _ = KillTimer(Some(hwnd), T_EDGE);
-            with_bar(|b| {
-                b.edge = RAIL_EDGE.load(std::sync::atomic::Ordering::Relaxed);
+            let on = RAIL_EDGE.load(std::sync::atomic::Ordering::Relaxed);
+            let who = RAIL_EDGE_WHO.load(std::sync::atomic::Ordering::Relaxed);
+            each_bar(|b| {
+                b.edge = on && who == b.popup.hwnd.0 as isize;
                 b.apply_visibility();
             });
             LRESULT(0)
         }
         WM_TIMER if wp.0 == T_FS => {
             let _ = KillTimer(Some(hwnd), T_FS);
-            with_bar(|b| {
+            each_bar(|b| {
                 b.check_fullscreen();
                 b.recheck_color();
             });
@@ -448,7 +504,7 @@ unsafe extern "system" fn ctl_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
         }
         WM_TIMER if wp.0 == T_APP => {
             let _ = KillTimer(Some(hwnd), T_APP);
-            with_bar(|b| {
+            each_bar(|b| {
                 if b.refresh_app() {
                     b.relayout();
                     b.render();
@@ -577,11 +633,14 @@ impl Bar {
     fn sync_behavior(&mut self) {
         let mode = prefs::get().rail;
         RAIL_SMART.store(mode == Behavior::Smart, std::sync::atomic::Ordering::Relaxed);
-        RAIL_ZONE.store(self.h + (12.0 * self.dpi) as i32, std::sync::atomic::Ordering::Relaxed);
-        RAIL_TOP.store(self.area.y, std::sync::atomic::Ordering::Relaxed);
-        RAIL_L.store(self.area.x, std::sync::atomic::Ordering::Relaxed);
-        RAIL_R.store(self.area.right(), std::sync::atomic::Ordering::Relaxed);
-        services::set_rail_area(Some(self.area));
+        if let Ok(mut z) = RAIL_ZONES.lock() {
+            let me = self.popup.hwnd.0 as isize;
+            z.retain(|e| e.0 != me);
+            z.push((me, self.area.x, self.area.right(), self.area.y, self.h + (12.0 * self.dpi) as i32));
+        }
+        if self.slot.is_none() {
+            services::set_rail_area(Some(self.area));
+        }
         if mode == Behavior::Fixed {
             shell::appbar::reserve_top(self.popup.hwnd, self.area, self.h);
         } else {
@@ -1284,6 +1343,7 @@ impl Bar {
             CTRL => {
                 self.close_menu();
                 nacre_platform::wins::focus::dismiss_shell_flyout();
+                services::set_rail_area(Some(self.area));
                 crate::controlcenter::toggle(self.area.y + self.h);
             }
             STAGEI => prefs::update(|st| st.stage = !st.stage),
@@ -1426,7 +1486,7 @@ unsafe extern "system" fn bar_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
         WM_MOUSEACTIVATE => LRESULT(MA_NOACTIVATE as isize),
         WM_MOUSEMOVE => {
             let (x, _) = xy(lp);
-            with_bar(|b| {
+            with_bar_at(hwnd, |b| {
                 if !b.tracking {
                     let mut t = TRACKMOUSEEVENT { cbSize: std::mem::size_of::<TRACKMOUSEEVENT>() as u32, dwFlags: TME_LEAVE, hwndTrack: hwnd, dwHoverTime: 0 };
                     if TrackMouseEvent(&mut t).is_ok() {
@@ -1447,7 +1507,7 @@ unsafe extern "system" fn bar_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
             LRESULT(0)
         }
         WM_MOUSELEAVE => {
-            with_bar(|b| {
+            with_bar_at(hwnd, |b| {
                 b.tracking = false;
                 b.hover = None;
                 b.update_capsule();
@@ -1459,7 +1519,7 @@ unsafe extern "system" fn bar_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
         }
         WM_LBUTTONDOWN => {
             let (x, _) = xy(lp);
-            with_bar(|b| {
+            with_bar_at(hwnd, |b| {
                 if let Some(id) = b.id_at(x) {
                     b.press_feedback();
                     b.click(id);
@@ -1468,15 +1528,15 @@ unsafe extern "system" fn bar_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
             LRESULT(0)
         }
         MENU_PICK => {
-            with_bar(|b| b.pick(wp.0));
+            with_bar_at(hwnd, |b| b.pick(wp.0));
             LRESULT(0)
         }
         MENU_CLOSE => {
-            with_bar(|b| b.close_menu());
+            with_bar_at(hwnd, |b| b.close_menu());
             LRESULT(0)
         }
         WM_NOTCH => {
-            with_bar(|b| {
+            with_bar_at(hwnd, |b| {
                 b.relayout();
                 b.render();
             });
@@ -1484,11 +1544,11 @@ unsafe extern "system" fn bar_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
         }
         WM_TEST_NET => {
             if wp.0 == 10 {
-                with_bar(|b| b.click(CTRL));
+                with_bar_at(hwnd, |b| b.click(CTRL));
             } else if wp.0 == 3 {
                 crate::netmenu::test_toggle_others();
             } else if wp.0 == 4 || wp.0 == 8 {
-                let h = with_bar(|b| b.area.y + b.h).unwrap_or(30);
+                let h = with_bar_at(hwnd, |b| b.area.y + b.h).unwrap_or(30);
                 crate::controlcenter::toggle(h);
             } else if wp.0 == 5 {
                 crate::controlcenter::test_open_picker();
@@ -1498,7 +1558,7 @@ unsafe extern "system" fn bar_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                 crate::netmenu::test_click_audio();
             } else {
                 let which = if wp.0 == 1 || wp.0 == 6 { crate::netmenu::Which::Bluetooth } else { crate::netmenu::Which::Wifi };
-                with_bar(|b| {
+                with_bar_at(hwnd, |b| {
                     if let Some((x, _)) = b.rect_of(WIFI) {
                         crate::netmenu::show(&b.comp, which, crate::netmenu::Anchor::Below(x as i32, b.h), b.dpi);
                     }
@@ -1507,7 +1567,7 @@ unsafe extern "system" fn bar_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
             LRESULT(0)
         }
         m if m == WM_APP + 22 => {
-            with_bar(|b| {
+            with_bar_at(hwnd, |b| {
                 if let Some(r) = &b.radios {
                     while let Ok(s) = r.snapshots.try_recv() {
                         b.wifi = s.wifi;
@@ -1520,7 +1580,7 @@ unsafe extern "system" fn bar_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
             LRESULT(0)
         }
         WM_TIMER if wp.0 == T_SIG => {
-            with_bar(|b| {
+            with_bar_at(hwnd, |b| {
                 let v = nacre_platform::wifi::link().map(|l| l.1);
                 if v != b.wifi_bars {
                     b.wifi_bars = v;
@@ -1534,7 +1594,7 @@ unsafe extern "system" fn bar_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
             if id == T_CLOCK {
                 let _ = SetTimer(Some(hwnd), T_CLOCK, time::ms_to_next_minute().max(200), None);
             }
-            with_bar(|b| {
+            with_bar_at(hwnd, |b| {
                 b.relayout();
                 b.render();
             });

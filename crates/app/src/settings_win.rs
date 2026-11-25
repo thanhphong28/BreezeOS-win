@@ -226,9 +226,15 @@ fn screen_row(part: u8, cur: nacre_core::display::Screen) -> Option<RowDef> {
     for (i, n) in names.iter().enumerate().take(count.max(1)) {
         opts.push((prefs::tr(n), Action::Screen(part, Screen::Nth(i as u8 + 1))));
     }
+    let screens = opts.len() - 1;
+    // Only Breeze Notch (2) and Upper Bar (1) can be shown on every monitor at once.
+    if part == 1 || part == 2 {
+        opts.push((prefs::tr("Semua"), Action::Screen(part, Screen::All)));
+    }
     let sel = match cur {
         Screen::Primary => 0,
-        Screen::Nth(n) => (n as usize).min(opts.len() - 1),
+        Screen::Nth(n) => (n as usize).min(screens),
+        Screen::All => opts.len() - 1,
     };
     Some(RowDef::Seg(prefs::tr("Tampilkan di"), opts, sel))
 }
@@ -595,7 +601,13 @@ impl Win {
                     let texts: Vec<f32> = opts.iter().map(|(t, _)| measure(t, &Style { px: (12.5 * d).round() as i32, weight: 500 }).0 as f32).collect();
                     let avail = (rx - lx) - measure(label, &Style { px: (13.5 * d).round() as i32, weight: 400 }).0 as f32 - 28.0 * d;
                     let need = |pad: f32, min: f32| texts.iter().map(|w| (w + pad).max(min)).sum::<f32>() + 6.0 * d;
-                    let (pad, min) = if need(32.0 * d, 66.0 * d) <= avail { (32.0 * d, 66.0 * d) } else { (18.0 * d, 48.0 * d) };
+                    let (pad, min) = if need(32.0 * d, 66.0 * d) <= avail {
+                        (32.0 * d, 66.0 * d)
+                    } else if need(18.0 * d, 48.0 * d) <= avail {
+                        (18.0 * d, 48.0 * d)
+                    } else {
+                        (10.0 * d, 30.0 * d)
+                    };
                     let widths: Vec<f32> = texts.iter().map(|w| (w + pad).max(min)).collect();
                     let total_w: f32 = widths.iter().sum::<f32>() + 6.0 * d;
                     let (bx, bh) = (rx - total_w, 26.0 * d);
@@ -1149,7 +1161,7 @@ impl Win {
                     (
                         None,
                         vec![RowDef::Seg(
-                            prefs::tr("Skala Deck, Visor, Rail & Quick Panel"),
+                            prefs::tr("Skala antarmuka"),
                             vec![("100%", Action::UiScale(100)), ("125%", Action::UiScale(125)), ("150%", Action::UiScale(150))],
                             scale_idx,
                         )],

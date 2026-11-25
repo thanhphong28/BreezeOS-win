@@ -1,0 +1,21 @@
+﻿name: Check
+
+on:
+  push:
+    branches-ignore:
+      - main
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: cargo check
+        shell: pwsh
+        run: cargo check --workspace --all-targets
+      - name: cargo test
+        shell: pwsh
+        run: cargo test --workspace

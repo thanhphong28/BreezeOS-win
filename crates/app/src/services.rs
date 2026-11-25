@@ -66,32 +66,27 @@ pub fn set_brightness(frac: f32) {
     }
 }
 
-use std::sync::atomic::AtomicI32;
-static NOTCH_L: AtomicI32 = AtomicI32::new(0);
-static NOTCH_R: AtomicI32 = AtomicI32::new(0);
-static NOTCH_H: AtomicI32 = AtomicI32::new(0);
-static NOTCH_T: AtomicI32 = AtomicI32::new(0);
+static NOTCHES: std::sync::Mutex<Vec<(isize, (i32, i32, i32, i32))>> = std::sync::Mutex::new(Vec::new());
 
-pub fn set_notch(l: i32, r: i32, h: i32, top: i32) {
-    NOTCH_T.store(top, Ordering::Relaxed);
-    NOTCH_L.store(l, Ordering::Relaxed);
-    NOTCH_R.store(r, Ordering::Relaxed);
-    NOTCH_H.store(h, Ordering::Relaxed);
-    let bar = BAR.load(Ordering::Relaxed);
-    if bar != 0 {
+// One entry per Breeze Notch window (id = its hwnd); l == r == 0 removes the entry.
+pub fn set_notch(id: isize, l: i32, r: i32, h: i32, top: i32) {
+    if let Ok(mut g) = NOTCHES.lock() {
+        g.retain(|e| e.0 != id);
+        if r > l && h > 0 {
+            g.push((id, (l, r, h, top)));
+        }
+    }
+    let bars: Vec<isize> = BARS.lock().map(|g| g.clone()).unwrap_or_default();
+    for bar in bars {
         unsafe {
             let _ = PostMessageW(Some(HWND(bar as *mut _)), WM_APP + 71, WPARAM(0), LPARAM(0));
         }
     }
 }
 
-pub fn notch() -> Option<(i32, i32, i32, i32)> {
-    let (l, r, h, t) = (NOTCH_L.load(Ordering::Relaxed), NOTCH_R.load(Ordering::Relaxed), NOTCH_H.load(Ordering::Relaxed), NOTCH_T.load(Ordering::Relaxed));
-    (r > l && h > 0).then_some((l, r, h, t))
-}
-
 pub fn notch_on(area: nacre_core::display::Area) -> Option<(i32, i32, i32)> {
-    notch().filter(|n| n.3 == area.y && n.0 >= area.x && n.1 <= area.right()).map(|n| (n.0 - area.x, n.1 - area.x, n.2))
+    let g = NOTCHES.lock().ok()?;
+    g.iter().map(|e| e.1).find(|n| n.3 == area.y && n.0 >= area.x && n.1 <= area.right()).map(|n| (n.0 - area.x, n.1 - area.x, n.2))
 }
 
 static RAIL_AREA: std::sync::Mutex<Option<nacre_core::display::Area>> = std::sync::Mutex::new(None);
@@ -106,11 +101,21 @@ pub fn rail_area() -> Option<nacre_core::display::Area> {
     RAIL_AREA.lock().ok().and_then(|g| *g)
 }
 
-static BAR: AtomicIsize = AtomicIsize::new(0);
+static BARS: std::sync::Mutex<Vec<isize>> = std::sync::Mutex::new(Vec::new());
+
 pub fn register_bar(h: HWND) {
-    BAR.store(h.0 as isize, Ordering::Relaxed);
+    if let Ok(mut g) = BARS.lock() {
+        if !g.contains(&(h.0 as isize)) {
+            g.push(h.0 as isize);
+        }
+    }
 }
 
+pub fn unregister_bar(h: HWND) {
+    if let Ok(mut g) = BARS.lock() {
+        g.retain(|b| *b != h.0 as isize);
+    }
+}
 pub fn post_island(msg: u32) {
     let h = ISLAND.load(Ordering::Relaxed);
     if h != 0 {

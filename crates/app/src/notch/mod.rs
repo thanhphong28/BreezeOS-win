@@ -265,6 +265,61 @@ fn notch_monitor() -> nacre_core::display::Monitor {
     nacre_platform::monitors::target(crate::prefs::get().notch_screen)
 }
 
+// slot = None: the main Breeze Notch (follows the setting; "All" resolves to the primary monitor).
+// slot = Some(i): an extra notch pinned to the i-th monitor, used when the setting is "All screens".
+fn notch_monitor_for(slot: Option<usize>) -> nacre_core::display::Monitor {
+    match slot {
+        Some(i) => nacre_platform::monitors::list().get(i).copied().unwrap_or_else(nacre_platform::monitors::primary),
+        None => notch_monitor(),
+    }
+}
+
+type Extras = (Option<Compositor>, Vec<(usize, isize)>);
+
+thread_local! {
+    static EXTRA: std::cell::RefCell<Extras> = const { std::cell::RefCell::new((None, Vec::new())) };
+}
+
+fn sync_extras(main: HWND) {
+    use nacre_core::display::Screen;
+    if with(main, |d| d.slot.is_some()).unwrap_or(true) {
+        return;
+    }
+    let s = crate::prefs::get();
+    let main_area = notch_monitor().area;
+    let want: Vec<usize> = if s.notch_enabled && s.notch_screen == Screen::All {
+        nacre_platform::monitors::list().iter().enumerate().filter(|(_, m)| m.area != main_area).map(|(i, _)| i).collect()
+    } else {
+        Vec::new()
+    };
+    let (comp, have) = EXTRA.with(|e| {
+        let e = e.borrow();
+        (e.0.clone(), e.1.clone())
+    });
+    let Some(comp) = comp else { return };
+    let mut keep: Vec<(usize, isize)> = Vec::new();
+    for (slot, h) in have {
+        if want.contains(&slot) {
+            keep.push((slot, h));
+        } else {
+            unsafe {
+                let _ = DestroyWindow(HWND(h as *mut _));
+            }
+        }
+    }
+    for slot in want {
+        if keep.iter().any(|k| k.0 == slot) {
+            continue;
+        }
+        let opts = Options { glass: None, mode: s.notch.mode(), reserve: s.notch.reserves() && !s.menubar };
+        match Notch::create_on(&comp, opts, Some(slot)) {
+            Ok(h) => keep.push((slot, h.0 as isize)),
+            Err(e) => log::line("notch", &format!("notch layar tambahan gagal: {e}")),
+        }
+    }
+    EXTRA.with(|e| e.borrow_mut().1 = keep);
+}
+
 fn notch_metrics(mon: &nacre_core::display::Monitor) -> (f32, f32, (f32, f32)) {
     let s = crate::prefs::get();
     let base = mon.scale() * crate::prefs::ui_scale();
@@ -291,6 +346,7 @@ pub struct Notch {
     win: (i32, i32),
     screen_w: i32,
     area: nacre_core::display::Area,
+    slot: Option<usize>,
 
     mode: Mode,
     look: Look,
@@ -388,6 +444,13 @@ pub struct Notch {
 
 impl Notch {
     pub fn create(host: &Host, opts: Options) -> windows_core::Result<HWND> {
+        EXTRA.with(|e| e.borrow_mut().0 = Some(host.compositor.clone()));
+        let hwnd = Self::create_on(&host.compositor, opts, None)?;
+        sync_extras(hwnd);
+        Ok(hwnd)
+    }
+
+    fn create_on(comp: &Compositor, opts: Options, slot: Option<usize>) -> windows_core::Result<HWND> {
         unsafe {
             let hi: HINSTANCE = GetModuleHandleW(None)?.into();
             let class = w!("BreezeOSNotch");
@@ -406,14 +469,14 @@ impl Notch {
                 0, 0, 400, 200,
                 None, None, Some(hi), None,
             )?;
-            let mon = notch_monitor();
+            let mon = notch_monitor_for(slot);
             let (base_dpi, dpi, scales) = notch_metrics(&mon);
             let area = mon.area;
             let screen_w = area.w;
             let win = win_size(base_dpi, scales, area);
             let _ = SetWindowPos(hwnd, None, area.x + (screen_w - win.0) / 2, area.y, win.0, win.1, SWP_NOACTIVATE | SWP_NOZORDER);
-            let comp = host.compositor.clone();
-            let surface = host.attach(hwnd, (win.0 as f32, win.1 as f32))?;
+            let comp = comp.clone();
+            let surface = nacre_ui::host::attach(&comp, hwnd, (win.0 as f32, win.1 as f32))?;
             let tier = auto_tier(opts.glass);
             let gfx = Gfx::shared(&comp)?;
             let body = Body::new(&comp, &gfx, &surface.root, win, dpi, tier)?;
@@ -438,6 +501,7 @@ impl Notch {
                 win,
                 screen_w,
                 area,
+                slot,
                 mode: Mode::Rest,
                 look: rest,
                 size: state::size_wh(rest, base_dpi, scales.0, scales.1),
@@ -543,24 +607,28 @@ impl Notch {
             });
             n.refresh();
             SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(n) as isize);
-            NOTCH_HWND.store(hwnd.0 as isize, Ordering::Relaxed);
-            crate::services::register_island(hwnd);
-            tracker::install(on_windows_changed);
+            if slot.is_none() {
+                NOTCH_HWND.store(hwnd.0 as isize, Ordering::Relaxed);
+                crate::services::register_island(hwnd);
+                tracker::install(on_windows_changed);
+            }
             let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
             timer(hwnd, T_START, 1600);
             timer(hwnd, T_MINUTE, nacre_platform::time::ms_to_next_minute());
             timer(hwnd, T_PRIVACY, 1500);
             timer(hwnd, T_TODO, 2500);
             with(hwnd, |d| {
-                d._bt = Some(nacre_platform::devices::watch_bluetooth(|name, on| {
-                    let sub = match (on, crate::prefs::get().lang) {
-                        (true, nacre_core::i18n::Lang::En) => "Connected",
-                        (false, nacre_core::i18n::Lang::En) => "Disconnected",
-                        (true, nacre_core::i18n::Lang::Vi) => "Đã kết nối",
-                        (false, nacre_core::i18n::Lang::Vi) => "Đã ngắt kết nối",
-                    };
-                    push_pill(PillKind::Device, &format!("bt:{name}"), &name, sub, Some(nacre_core::notch::pills::DEVICE_MS));
-                }));
+                if slot.is_none() {
+                    d._bt = Some(nacre_platform::devices::watch_bluetooth(|name, on| {
+                        let sub = match (on, crate::prefs::get().lang) {
+                            (true, nacre_core::i18n::Lang::En) => "Connected",
+                            (false, nacre_core::i18n::Lang::En) => "Disconnected",
+                            (true, nacre_core::i18n::Lang::Vi) => "Đã kết nối",
+                            (false, nacre_core::i18n::Lang::Vi) => "Đã ngắt kết nối",
+                        };
+                        push_pill(PillKind::Device, &format!("bt:{name}"), &name, sub, Some(nacre_core::notch::pills::DEVICE_MS));
+                    }));
+                }
                 d._drop_target = drop::register(hwnd, WM_DND, d.dnd.clone());
                 if d._drop_target.is_none() {
                     log::line("notch", "seret-taruh tidak tersedia");
@@ -573,7 +641,9 @@ impl Notch {
                 if opts.reserve && !d.off && !crate::prefs::get().menubar {
                     d.set_reserved(true);
                 }
-                d.load_focus();
+                if slot.is_none() {
+                    d.load_focus();
+                }
                 d.refresh_glance_data(true);
                 d.request_today();
                 d.publish_notch();
@@ -2369,11 +2439,11 @@ impl Notch {
 
     fn publish_notch(&self) {
         if self.off {
-            crate::services::set_notch(0, 0, 0, 0);
+            crate::services::set_notch(self.hwnd.0 as isize, 0, 0, 0, 0);
             return;
         }
         let (l, t, r, b) = self.pill_screen_rect();
-        crate::services::set_notch(l, r, b - t - (4.0 * self.dpi) as i32, t);
+        crate::services::set_notch(self.hwnd.0 as isize, l, r, b - t - (4.0 * self.dpi) as i32, t);
     }
 
     fn set_reserved(&mut self, on: bool) {
@@ -2390,7 +2460,8 @@ impl Notch {
     fn apply_prefs(&mut self) {
         let s = crate::prefs::get();
         self.off = !s.notch_enabled;
-        let rail_here = s.menubar && nacre_platform::monitors::target(s.rail_screen).area == notch_monitor().area;
+        let rail_here = s.menubar
+            && (s.rail_screen == nacre_core::display::Screen::All || nacre_platform::monitors::target(s.rail_screen).area == notch_monitor_for(self.slot).area);
         let (vis, reserve) = (s.notch.mode(), s.notch.reserves() && s.notch_enabled && !rail_here);
         if vis != self.vis {
             self.vis = vis;
@@ -2460,7 +2531,7 @@ impl Notch {
     }
 
     fn on_reconfigure(&mut self) {
-        let mon = notch_monitor();
+        let mon = notch_monitor_for(self.slot);
         let screen_w = mon.area.w;
         let (base_dpi, dpi, scales) = notch_metrics(&mon);
         let win = win_size(base_dpi, scales, mon.area);
@@ -2888,6 +2959,9 @@ unsafe extern "system" fn proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> 
         }
         WM_TIMER => {
             with(hwnd, |d| d.on_timer(wp.0));
+            if wp.0 == T_RECONF {
+                sync_extras(hwnd);
+            }
             LRESULT(0)
         }
         crate::prefs::WM_PREFS => {
@@ -2895,6 +2969,7 @@ unsafe extern "system" fn proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> 
                 d.apply_prefs();
                 d.on_reconfigure();
             });
+            sync_extras(hwnd);
             LRESULT(0)
         }
         WM_TOPMOST => {
@@ -2926,8 +3001,19 @@ unsafe extern "system" fn proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> 
             DefWindowProcW(hwnd, msg, wp, lp)
         }
         WM_DESTROY => {
-            NOTCH_HWND.store(0, Ordering::Relaxed);
+            if NOTCH_HWND.load(Ordering::Relaxed) == hwnd.0 as isize {
+                NOTCH_HWND.store(0, Ordering::Relaxed);
+            }
+            crate::services::set_notch(hwnd.0 as isize, 0, 0, 0, 0);
             LRESULT(0)
+        }
+        WM_NCDESTROY => {
+            // Free the Notch (shadow + edge strip windows included) when an extra-monitor notch is closed.
+            let p = SetWindowLongPtrW(hwnd, GWLP_USERDATA, 0) as *mut Notch;
+            if !p.is_null() {
+                drop(Box::from_raw(p));
+            }
+            DefWindowProcW(hwnd, msg, wp, lp)
         }
         _ => DefWindowProcW(hwnd, msg, wp, lp),
     }

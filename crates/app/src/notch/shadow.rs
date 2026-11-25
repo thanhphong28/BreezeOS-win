@@ -31,6 +31,14 @@ unsafe extern "system" fn proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> 
     }
 }
 
+impl Drop for Shadow {
+    fn drop(&mut self) {
+        unsafe {
+            let _ = DestroyWindow(self.hwnd);
+        }
+    }
+}
+
 impl Shadow {
     pub fn new(comp: &Compositor, size: (i32, i32), pad: f32) -> windows_core::Result<Shadow> {
         unsafe {
