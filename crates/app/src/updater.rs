@@ -26,13 +26,19 @@ fn set(p: Phase) {
     crate::prefs::broadcast();
 }
 
-fn endpoint() -> (String, String) {
+fn endpoints() -> (Vec<(String, Option<&'static str>, u64)>, String) {
     match std::env::var("NACRE_UPDATE_URL") {
         Ok(u) if u.starts_with("http://127.0.0.1:") => {
             let origin: String = u.splitn(4, '/').take(3).collect::<Vec<_>>().join("/");
-            (u, format!("{origin}/"))
+            (vec![(u, Some("application/vnd.github+json"), 12)], format!("{origin}/"))
         }
-        _ => (update::API.to_string(), format!("https://github.com/{}/releases/download/", update::REPO)),
+        _ => (
+            vec![
+                (update::META.to_string(), None, 6),
+                (update::API.to_string(), Some("application/vnd.github+json"), 10),
+            ],
+            format!("https://github.com/{}/releases/download/", update::REPO),
+        ),
     }
 }
 
@@ -70,8 +76,18 @@ fn check(manual: bool) {
     if manual {
         set(Phase::Checking);
     }
-    let (url, allowed) = endpoint();
-    let result = nacre_platform::net::http_get_accept(&url, Some("application/vnd.github+json"), Duration::from_secs(12));
+    let (urls, allowed) = endpoints();
+    let mut result = None;
+    for (url, accept, secs) in urls {
+        let got = nacre_platform::net::http_get_accept(&url, accept, Duration::from_secs(secs));
+        if matches!(&got, Some((200, _))) {
+            result = got;
+            break;
+        }
+        if result.is_none() {
+            result = got;
+        }
+    }
     let next = match result {
         Some((200, body)) => match update::parse_release_from(&body, &allowed) {
             Some(r) if update::is_newer(&r.version, CURRENT) => Some(Phase::Available(r)),

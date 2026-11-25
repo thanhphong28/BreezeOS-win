@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Phiên bản cần đóng gói (ví dụ: 1.0.0)"
+        description: "Phiên bản cần đóng gói (ví dụ: 1.0.1)"
         required: false
-        default: "1.0.0"
+        default: "1.0.1"
 
 permissions:
   contents: write
@@ -65,11 +65,12 @@ jobs:
           "sha_setup=$shaSetup" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           "sha_zip=$shaZip"     | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
-      - name: Publish or Update GitHub Release
+      - name: Publish GitHub Release & CDN Metadata
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          $repo = "${{ github.repository }}"
           $ver = "${{ steps.build.outputs.version }}"
           $tag = "${{ steps.build.outputs.tag }}"
           $shaSetup = "${{ steps.build.outputs.sha_setup }}"
@@ -106,3 +107,40 @@ jobs:
           } else {
             gh release create $tag $setup $zip --title "BreezeOS $ver" --notes-file release-notes.md --latest
           }
+
+          # Publish CDN-backed latest.json to branch release-meta so in-app updater works in <0.3s even when api.github.com 504s
+          $metaObj = @{
+            tag_name   = $tag
+            html_url   = "https://github.com/$repo/releases/tag/$tag"
+            draft      = $false
+            prerelease = $false
+            assets     = @(
+              @{
+                name                  = "BreezeOS-Setup-$ver.exe"
+                browser_download_url  = "https://github.com/$repo/releases/download/$tag/BreezeOS-Setup-$ver.exe"
+                digest                = "sha256:$shaSetup"
+              },
+              @{
+                name                  = "BreezeOS-$ver-win-x64.zip"
+                browser_download_url  = "https://github.com/$repo/releases/download/$tag/BreezeOS-$ver-win-x64.zip"
+                digest                = "sha256:$shaZip"
+              }
+            )
+          }
+          $metaJson = $metaObj | ConvertTo-Json -Depth 5
+          $b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($metaJson))
+
+          # Create release-meta branch if it doesn't exist yet
+          gh api "repos/$repo/git/ref/heads/release-meta" *> $null
+          if ($LASTEXITCODE -ne 0) {
+            $mainSha = gh api "repos/$repo/git/ref/heads/main" --jq .object.sha
+            gh api -X POST "repos/$repo/git/refs" -f ref="refs/heads/release-meta" -f sha="$mainSha" *> $null
+          }
+
+          $existingFileSha = gh api "repos/$repo/contents/latest.json?ref=release-meta" --jq .sha 2>$null
+          if ($LASTEXITCODE -eq 0 -and $existingFileSha) {
+            gh api -X PUT "repos/$repo/contents/latest.json" -f message="chore: update latest.json for $tag" -f content="$b64" -f branch="release-meta" -f sha="$existingFileSha" *> $null
+          } else {
+            gh api -X PUT "repos/$repo/contents/latest.json" -f message="chore: publish latest.json for $tag" -f content="$b64" -f branch="release-meta" *> $null
+          }
+          Write-Host "Published CDN metadata to branch release-meta."

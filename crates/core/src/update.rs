@@ -1,8 +1,9 @@
 use crate::notch::json;
 
 pub const REPO: &str = "thanhphong28/BreezeOS-win";
+pub const META: &str = "https://raw.githubusercontent.com/thanhphong28/BreezeOS-win/release-meta/latest.json";
 pub const API: &str = "https://api.github.com/repos/thanhphong28/BreezeOS-win/releases/latest";
-pub const RELEASES: &str = "https://github.com/thanhphong28/BreezeOS-win/releases/latest";
+pub const RELEASES: &str = "https://github.com/thanhphong28/BreezeOS-win/releases";
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Release {

@@ -12,7 +12,7 @@
 <p align="center">
   <a href="https://github.com/thanhphong28/BreezeOS-win/releases"><img alt="Lượt tải" src="https://img.shields.io/github/downloads/thanhphong28/BreezeOS-win/total?label=l%C6%B0%E1%BB%A3t%20t%E1%BA%A3i&color=brightgreen"></a>
   <img alt="Windows 11" src="https://img.shields.io/badge/Windows-11-0078D4?logo=windows11&logoColor=white">
-  <img alt="Phiên bản" src="https://img.shields.io/badge/phi%C3%AAn%20b%E1%BA%A3n-1.0.0-0a84ff">
+  <img alt="Phiên bản" src="https://img.shields.io/badge/phi%C3%AAn%20b%E1%BA%A3n-1.0.1-0a84ff">
   <img alt="Rust" src="https://img.shields.io/badge/Vi%E1%BA%BFt%20b%E1%BA%B1ng-Rust-orange?logo=rust">
   <img alt="Ngôn ngữ" src="https://img.shields.io/badge/Ng%C3%B4n%20ng%E1%BB%AF-Ti%E1%BA%BFng%20Vi%E1%BB%87t%20%C2%B7%20English-purple">
   <img alt="Quyền riêng tư" src="https://img.shields.io/badge/thu%20th%E1%BA%ADp%20d%E1%BB%AF%20li%E1%BB%87u-kh%C3%B4ng-success">
@@ -53,7 +53,7 @@ Toàn bộ chương trình là một tệp thực thi thuần bản địa duy n
   <img src="assets/screenshots/desktop.png" alt="Màn hình BreezeOS với Deck, thanh Rail, Visor và Tiện ích màn hình" width="900">
 </p>
 
-### 🌟 Điểm nổi bật trên phiên bản 1.0.0
+### 🌟 Điểm nổi bật trên phiên bản 1.0.1
 
 - **Hỗ trợ trọn vẹn Tiếng Việt & Tiếng Anh**: Chuyển đổi tức thì tại *Cài đặt → Chung → Ngôn ngữ*. Toàn bộ giao diện, lịch, thứ/ngày/tháng, phiên tập trung, menu thanh Rail và trang gửi tệp sang điện thoại đều được bản địa hóa tự nhiên.
 - **Hỗ trợ đa màn hình thông minh**: Tùy chọn màn hình hiển thị riêng cho Deck, Rail, Visor và Tiện ích (*Màn hình chính*, *Màn hình 1*, *Màn hình 2*...) với tỷ lệ DPI độc lập trên từng màn hình; tự động thu về màn hình chính khi rút cáp và khôi phục khi cắm lại.
@@ -94,12 +94,12 @@ Tải bản phát hành mới nhất tại trang **[Releases](https://github.com
 
 | Tệp tải về | Khuyên dùng cho |
 |---|---|
-| `BreezeOS-Setup-1.0.0.exe` | **Đa số người dùng.** Cài đặt theo tài khoản người dùng (không cần quyền Quản trị viên / Admin), tùy chọn tạo lối tắt Start Menu và khởi động cùng Windows, hỗ trợ tự động cập nhật và gỡ cài đặt sạch qua *Cài đặt Windows → Ứng dụng*. |
-| `BreezeOS-1.0.0-win-x64.zip` | **Bản chạy ngay (Portable).** Giải nén vào bất kỳ thư mục nào và giữ `breezeos.exe`, `breezeos-guard.exe` cùng thư mục `fonts` nằm chung với nhau. |
+| `BreezeOS-Setup-1.0.1.exe` | **Đa số người dùng.** Cài đặt theo tài khoản người dùng (không cần quyền Quản trị viên / Admin), tùy chọn tạo lối tắt Start Menu và khởi động cùng Windows, hỗ trợ tự động cập nhật và gỡ cài đặt sạch qua *Cài đặt Windows → Ứng dụng*. |
+| `BreezeOS-1.0.1-win-x64.zip` | **Bản chạy ngay (Portable).** Giải nén vào bất kỳ thư mục nào và giữ `breezeos.exe`, `breezeos-guard.exe` cùng thư mục `fonts` nằm chung với nhau. |
 
 ### Cài đặt bằng bộ cài `.exe`
 
-1. Chạy `BreezeOS-Setup-1.0.0.exe`.
+1. Chạy `BreezeOS-Setup-1.0.1.exe`.
 2. Nếu Windows SmartScreen hiển thị cảnh báo ứng dụng chưa ký số thương mại, chọn **More info → Run anyway** (chỉ thực hiện với tệp tải trực tiếp từ kho lưu trữ chính thức này).
 3. Chọn tùy chọn mong muốn (tạo lối tắt Start Menu, khởi động cùng Windows) và hoàn tất.
 
@@ -110,7 +110,7 @@ Một số trình quét heuristic có thể cảnh báo nhầm do tệp thực t
 Để tự kiểm tra tính toàn vẹn của tệp cài đặt:
 
 ```powershell
-Get-FileHash .\BreezeOS-Setup-1.0.0.exe -Algorithm SHA256
+Get-FileHash .\BreezeOS-Setup-1.0.1.exe -Algorithm SHA256
 ```
 
 Đối chiếu kết quả với mã **SHA‑256** công bố trên trang Releases — hoặc bạn có thể tự biên dịch trực tiếp từ mã nguồn theo hướng dẫn bên dưới.
@@ -288,10 +288,10 @@ Sau khi build xong, hai tệp `breezeos.exe` và `breezeos-guard.exe` sẽ nằm
 cargo test --workspace
 
 winget install JRSoftware.InnoSetup                            # chỉ cần cài một lần
-powershell -File installer\build-installer.ps1 -Version 1.0.0
+powershell -File installer\build-installer.ps1 -Version 1.0.1
 ```
 
-Kịch bản đóng gói sẽ tự động xóa đường dẫn cục bộ khỏi binary, kiểm tra quyền riêng tư trên tệp `.exe` và xuất ra `dist\BreezeOS-Setup-1.0.0.exe` cùng `dist\BreezeOS-1.0.0-win-x64.zip`.
+Kịch bản đóng gói sẽ tự động xóa đường dẫn cục bộ khỏi binary, kiểm tra quyền riêng tư trên tệp `.exe` và xuất ra `dist\BreezeOS-Setup-1.0.1.exe` cùng `dist\BreezeOS-1.0.1-win-x64.zip`.
 
 ### 4. Chạy thử nghiệm cô lập an toàn
 
