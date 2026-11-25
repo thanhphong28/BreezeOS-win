@@ -1,0 +1,108 @@
+name: Build & Publish Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Phiên bản cần đóng gói (ví dụ: 1.0.0)"
+        required: false
+        default: "1.0.0"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build Installer & Update Release
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Cache Cargo registry & build
+        uses: Swatinem/rust-cache@v2
+
+      - name: Ensure Inno Setup 6 is installed
+        shell: pwsh
+        run: |
+          $iscc = Get-Command iscc.exe -ErrorAction SilentlyContinue
+          if (-not $iscc -and -not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) {
+            choco install innosetup --no-progress -y
+          }
+
+      - name: Run unit tests
+        shell: pwsh
+        run: cargo test --workspace
+
+      - name: Resolve version & build installer
+        id: build
+        shell: pwsh
+        run: |
+          if ("${{ github.event.inputs.version }}") {
+            $ver = "${{ github.event.inputs.version }}".TrimStart('v', 'V')
+          } elseif ("${{ github.ref_name }}" -like "v*") {
+            $ver = "${{ github.ref_name }}".TrimStart('v', 'V')
+          } else {
+            $toml = Get-Content Cargo.toml -Raw
+            if ($toml -match 'version\s*=\s*"([^"]+)"') { $ver = $Matches[1] } else { throw "Cannot parse Cargo.toml version" }
+          }
+          Write-Host "Building BreezeOS v$ver..."
+          powershell -File installer\build-installer.ps1 -Version $ver
+          $setup = "dist\BreezeOS-Setup-$ver.exe"
+          $zip   = "dist\BreezeOS-$ver-win-x64.zip"
+          $shaSetup = (Get-FileHash $setup -Algorithm SHA256).Hash.ToLower()
+          $shaZip   = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+          "version=$ver" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "tag=v$ver"    | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "sha_setup=$shaSetup" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "sha_zip=$shaZip"     | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Publish or Update GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $ver = "${{ steps.build.outputs.version }}"
+          $tag = "${{ steps.build.outputs.tag }}"
+          $shaSetup = "${{ steps.build.outputs.sha_setup }}"
+          $shaZip   = "${{ steps.build.outputs.sha_zip }}"
+
+          $notes = @"
+          <p align="center">
+            <img src="https://raw.githubusercontent.com/thanhphong28/BreezeOS-win/main/assets/logo.png" alt="BreezeOS" width="140">
+          </p>
+
+          ## ✨ BreezeOS $ver
+
+          Giao diện kính mờ hiện đại cho **Windows 11** — phát triển bởi **Nguyễn Thanh Phong (Breeze Boy)**, viết thuần bằng **Rust** (~15 MB RAM khi chạy nền), hỗ trợ đầy đủ **Tiếng Việt** & **English**.
+
+          ### 📦 Tệp tải xuống
+          - **Bộ cài đặt khuyên dùng**: ``BreezeOS-Setup-$ver.exe`` *(cài đặt không cần quyền Admin, hỗ trợ tự động cập nhật ngay trong ứng dụng)*
+          - **Bản chạy ngay (Portable)**: ``BreezeOS-$ver-win-x64.zip`` *(giải nén và chạy trực tiếp ``breezeos.exe``)*
+
+          ### 🔐 Mã kiểm tra SHA-256
+          | Tệp | SHA-256 |
+          |---|---|
+          | ``BreezeOS-Setup-$ver.exe`` | ``$shaSetup`` |
+          | ``BreezeOS-$ver-win-x64.zip`` | ``$shaZip`` |
+          "@ -replace '(?m)^          ', ''
+
+          $notes | Set-Content -Path release-notes.md -Encoding UTF8
+          $setup = "dist\BreezeOS-Setup-$ver.exe"
+          $zip   = "dist\BreezeOS-$ver-win-x64.zip"
+
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag $setup $zip --clobber
+            gh release edit $tag --title "BreezeOS $ver" --notes-file release-notes.md --latest
+          } else {
+            gh release create $tag $setup $zip --title "BreezeOS $ver" --notes-file release-notes.md --latest
+          }

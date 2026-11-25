@@ -48,7 +48,7 @@ const LOGO: u32 = 1;
 const APP: u32 = 2;
 const PROF0: u32 = 30;
 const PROF_CMD: usize = 200_000;
-const GUIDE_URL: &str = "https://github.com/thanhphong28/BreezeOS-win/blob/main/docs/PANDUAN.md";
+const GUIDE_URL: &str = "https://github.com/thanhphong28/BreezeOS-win#readme";
 const CLOCK: u32 = 10;
 const CTRL: u32 = 11;
 const SEARCH: u32 = 12;
@@ -838,21 +838,22 @@ impl Bar {
     }
 
     fn draw_logo(&mut self, x: f32, w: f32) {
-        let size = (self.h as f32 * 0.54).round() as u32;
         let rgb = self.fg();
         let custom = crate::menulogo::path().is_some();
-        let size = if custom { (self.h as f32 * 0.5).round() as u32 } else { size };
+        let size = (self.h as f32 * if custom { 0.5 } else { 0.72 }).round() as u32;
         let key = format!("logo|{size}|{rgb:?}|{}|{custom}", crate::menulogo::generation());
         let hit = self.cache.get(&key).cloned();
         let (surf, lw, lh) = match hit {
             Some(v) => v,
             None => {
-                let (bw, bh, data) = match crate::menulogo::bitmap(size, rgb).filter(|_| custom) {
-                    Some(b) => (b.w, b.h, b.bgra),
-                    None => (size, size, nacre_core::logo::render_badge(size, rgb)),
+                let bmp = if custom {
+                    crate::menulogo::bitmap(size, rgb)
+                } else {
+                    crate::menulogo::default_bitmap(size, rgb)
                 };
-                let Ok(s) = self.gfx.surface_from_bgra(bw, bh, &data) else { return };
-                let v = (s, bw as i32, bh as i32);
+                let Some(b) = bmp else { return };
+                let Ok(s) = self.gfx.surface_from_bgra(b.w, b.h, &b.bgra) else { return };
+                let v = (s, b.w as i32, b.h as i32);
                 self.cache.insert(key, v.clone());
                 v
             }

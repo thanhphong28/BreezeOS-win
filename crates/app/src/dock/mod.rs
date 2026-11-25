@@ -706,8 +706,17 @@ impl Dock {
         }
         self.views.clear();
         let icon = self.m.icon;
+        let px = ((self.m.icon * self.m.max_scale * 1.15) as i32).clamp(64, 256) as u32;
+        if !custom_icons::has(START_KEY) && !icons::is_themed(START_KEY) && !self.surfaces.contains_key(START_KEY) {
+            let p = crate::prefs::get();
+            if let Some(tile) = crate::menulogo::start_tile(px, p.dock_plates) {
+                let data = nacre_core::iconplate::style_icon_v(&tile, p.icon_style, p.icon_tint, crate::prefs::icon_dark());
+                if let Ok(s) = self.gfx.surface_from_bgra(px, px, &data) {
+                    self.surfaces.insert(START_KEY.to_string(), s);
+                }
+            }
+        }
         if !icons::is_themed(LAUNCHPAD_KEY) && !self.surfaces.contains_key(LAUNCHPAD_KEY) {
-            let px = ((self.m.icon * self.m.max_scale * 1.15) as i32).clamp(64, 256) as u32;
             let p = crate::prefs::get();
             let data = nacre_core::iconplate::style_icon_v(&nacre_core::iconplate::launchpad_icon(px), p.icon_style, p.icon_tint, crate::prefs::icon_dark());
             if let Ok(s) = self.gfx.surface_from_bgra(px, px, &data) {
@@ -719,8 +728,7 @@ impl Dock {
         }
         for e in self.entries.clone() {
             let v = match e {
-                Entry::Start if custom_icons::has(START_KEY) => View::app(&self.comp, &self.content, START_KEY.to_string(), icon, false, self.dpi),
-                Entry::Start => View::start(&self.comp, &self.content, icon),
+                Entry::Start => View::app(&self.comp, &self.content, START_KEY.to_string(), icon, false, self.dpi),
                 Entry::Launchpad => View::app(&self.comp, &self.content, LAUNCHPAD_KEY.to_string(), icon, false, self.dpi),
                 Entry::Sep => View::separator(&self.comp, &self.content, self.m.separator, icon),
                 Entry::Trash => View::app(&self.comp, &self.content, TRASH_PATH.to_string(), icon, false, self.dpi),

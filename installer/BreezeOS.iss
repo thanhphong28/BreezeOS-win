@@ -12,7 +12,7 @@
 AppId={{939A19A7-DB24-45FB-836C-6ED85D256BC3}
 AppName={#AppName}
 AppVersion={#AppVersion}
-AppPublisher=BreezeOS
+AppPublisher=Nguyễn Thanh Phong (Breeze Boy)
 AppPublisherURL=https://github.com/thanhphong28/BreezeOS-win
 AppSupportURL=https://github.com/thanhphong28/BreezeOS-win/issues
 DefaultDirName={localappdata}\Programs\{#AppName}
@@ -43,7 +43,6 @@ Source: "{#SourceDir}\breezeos-guard.exe"; DestDir: "{app}"; Flags: ignoreversio
 Source: "..\assets\fonts\*"; DestDir: "{app}\fonts"; Flags: ignoreversion
 Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\LICENSE.md"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\docs\PANDUAN.md"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: startmenu

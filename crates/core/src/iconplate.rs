@@ -248,6 +248,33 @@ pub fn free(bgra: &[u8], n: u32) -> Vec<u8> {
     with_shadow(&canvas, n)
 }
 
+pub fn dark_plate(bgra: &[u8], n: u32) -> Vec<u8> {
+    if n < 8 || bgra.len() < (n * n * 4) as usize {
+        return bgra.to_vec();
+    }
+    let mut canvas = vec![0u8; (n * n * 4) as usize];
+    let half = n as f32 * BODY / 2.0;
+    for y in 0..n {
+        let t = y as f32 / n as f32;
+        let (r, g, b) = ((30.0 - 16.0 * t) as u32, (32.0 - 17.0 * t) as u32, (40.0 - 20.0 * t) as u32);
+        for x in 0..n {
+            let cov = squircle_cov(n, half, x, y);
+            if cov > 0.0 {
+                let a = (cov * 255.0) as u32;
+                let i = ((y * n + x) * 4) as usize;
+                canvas[i] = (b * a / 255) as u8;
+                canvas[i + 1] = (g * a / 255) as u8;
+                canvas[i + 2] = (r * a / 255) as u8;
+                canvas[i + 3] = a as u8;
+            }
+        }
+    }
+    let m = (n as f32 * 0.72).round() as u32;
+    let small = resample(bgra, n, m);
+    over(&mut canvas, n, &small, m, (n - m) / 2, (n - m) / 2);
+    with_shadow(&canvas, n)
+}
+
 pub fn launchpad_icon(n: u32) -> Vec<u8> {
     const DOTS: [[u8; 3]; 9] = [
         [255, 69, 58],

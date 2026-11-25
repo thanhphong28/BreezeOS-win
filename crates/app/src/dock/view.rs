@@ -32,7 +32,6 @@ pub fn rounded_clip(comp: &Compositor, w: f32, h: f32, r: f32) -> Result<Composi
 }
 
 pub enum Kind {
-    Start,
     App { path: String },
     Separator,
 }
@@ -88,37 +87,6 @@ impl View {
             dot.SetClip(&rounded_clip(comp, d, d, d / 2.0)?)?;
             content.Children()?.InsertAtTop(&dot)?;
             v.dot = Some(dot);
-        }
-        Ok(v)
-    }
-
-    pub fn start(comp: &Compositor, content: &ContainerVisual, icon_px: f32) -> Result<View> {
-        let v = View::base(comp, content, Kind::Start, icon_px, icon_px)?;
-        let full = icon_px;
-        let icon_px = if crate::prefs::get().dock_plates { (full * nacre_core::iconplate::BODY).round() } else { full };
-        let inset = (full - icon_px) / 2.0;
-        let tile = comp.CreateSpriteVisual()?;
-        tile.SetOffset(Vector3 { X: inset, Y: inset, Z: 0.0 })?;
-        tile.SetSize(Vector2 { X: icon_px, Y: icon_px })?;
-        let grad = comp.CreateLinearGradientBrush()?;
-        grad.SetStartPoint(Vector2 { X: 0.0, Y: 0.0 })?;
-        grad.SetEndPoint(Vector2 { X: 1.0, Y: 1.0 })?;
-        let stops = grad.ColorStops()?;
-        stops.Append(&comp.CreateColorGradientStopWithOffsetAndColor(0.0, Color { A: 255, R: 120, G: 170, B: 255 })?)?;
-        stops.Append(&comp.CreateColorGradientStopWithOffsetAndColor(1.0, Color { A: 255, R: 150, G: 90, B: 240 })?)?;
-        tile.SetBrush(&grad)?;
-        tile.SetClip(&rounded_clip(comp, icon_px, icon_px, icon_px * 0.23)?)?;
-        v.node.Children()?.InsertAtTop(&tile)?;
-        let petal = icon_px * 0.17;
-        let c = inset + icon_px / 2.0;
-        let off = icon_px * 0.15;
-        for (dx, dy) in [(-off, -off), (off, -off), (-off, off), (off, off)] {
-            let p = comp.CreateSpriteVisual()?;
-            p.SetSize(Vector2 { X: petal * 2.0, Y: petal * 2.0 })?;
-            p.SetOffset(Vector3 { X: c + dx - petal, Y: c + dy - petal, Z: 0.0 })?;
-            p.SetBrush(&comp.CreateColorBrushWithColor(Color { A: 230, R: 255, G: 255, B: 255 })?)?;
-            p.SetClip(&rounded_clip(comp, petal * 2.0, petal * 2.0, petal)?)?;
-            v.node.Children()?.InsertAtTop(&p)?;
         }
         Ok(v)
     }

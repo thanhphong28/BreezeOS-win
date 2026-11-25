@@ -1,86 +1,3 @@
-const STROKE: f32 = 0.10;
-const SEGMENTS: &[((f32, f32), (f32, f32))] = &[
-    ((0.50, 0.06), (0.17, 0.39)),
-    ((0.50, 0.06), (0.83, 0.39)),
-    ((0.355, 0.27), (0.645, 0.27)),
-    ((0.17, 0.61), (0.50, 0.94)),
-    ((0.83, 0.61), (0.50, 0.94)),
-];
-
-fn seg_dist(p: (f32, f32), a: (f32, f32), b: (f32, f32)) -> f32 {
-    let (abx, aby) = (b.0 - a.0, b.1 - a.1);
-    let (apx, apy) = (p.0 - a.0, p.1 - a.1);
-    let t = ((apx * abx + apy * aby) / (abx * abx + aby * aby)).clamp(0.0, 1.0);
-    let (cx, cy) = (a.0 + abx * t, a.1 + aby * t);
-    ((p.0 - cx).powi(2) + (p.1 - cy).powi(2)).sqrt()
-}
-
-fn inside(p: (f32, f32)) -> bool {
-    inside_with(p, STROKE)
-}
-
-fn inside_with(p: (f32, f32), stroke: f32) -> bool {
-    SEGMENTS.iter().any(|(a, b)| seg_dist(p, *a, *b) <= stroke / 2.0)
-}
-
-pub fn render(size: u32, rgb: [u8; 3]) -> Vec<u8> {
-    let n = size.max(1);
-    let ss = 4u32;
-    let mut out = vec![0u8; (n * n * 4) as usize];
-    for y in 0..n {
-        for x in 0..n {
-            let mut hit = 0u32;
-            for sy in 0..ss {
-                for sx in 0..ss {
-                    let p = (
-                        (x as f32 + (sx as f32 + 0.5) / ss as f32) / n as f32,
-                        (y as f32 + (sy as f32 + 0.5) / ss as f32) / n as f32,
-                    );
-                    if inside(p) {
-                        hit += 1;
-                    }
-                }
-            }
-            let a = (hit * 255 / (ss * ss)) as u32;
-            let i = ((y * n + x) * 4) as usize;
-            out[i] = (rgb[2] as u32 * a / 255) as u8;
-            out[i + 1] = (rgb[1] as u32 * a / 255) as u8;
-            out[i + 2] = (rgb[0] as u32 * a / 255) as u8;
-            out[i + 3] = a as u8;
-        }
-    }
-    out
-}
-
-pub fn render_badge(size: u32, rgb: [u8; 3]) -> Vec<u8> {
-    let n = size.max(1);
-    let ss = 4u32;
-    let (outer, inner) = (0.46f32, 0.335f32);
-    let mut out = vec![0u8; (n * n * 4) as usize];
-    for y in 0..n {
-        for x in 0..n {
-            let mut hit = 0u32;
-            for sy in 0..ss {
-                for sx in 0..ss {
-                    let p = ((x as f32 + (sx as f32 + 0.5) / ss as f32) / n as f32, (y as f32 + (sy as f32 + 0.5) / ss as f32) / n as f32);
-                    let (dx, dy) = (p.0 - 0.5, p.1 - 0.5);
-                    let d2 = dx * dx + dy * dy;
-                    if d2 <= outer * outer && d2 >= inner * inner {
-                        hit += 1;
-                    }
-                }
-            }
-            let a = hit * 255 / (ss * ss);
-            let i = ((y * n + x) * 4) as usize;
-            out[i] = (rgb[2] as u32 * a / 255) as u8;
-            out[i + 1] = (rgb[1] as u32 * a / 255) as u8;
-            out[i + 2] = (rgb[0] as u32 * a / 255) as u8;
-            out[i + 3] = a as u8;
-        }
-    }
-    out
-}
-
 fn rr_dist(px: f32, py: f32, cx: f32, cy: f32, hw: f32, hh: f32, r: f32) -> f32 {
     let (qx, qy) = ((px - cx).abs() - (hw - r), (py - cy).abs() - (hh - r));
     let outside = (qx.max(0.0).powi(2) + qy.max(0.0).powi(2)).sqrt();
@@ -309,6 +226,7 @@ mod tests {
 
     #[test]
     fn battery_outline_fill_and_nub() {
+        use super::*;
         let (w, h) = (52u32, 24u32);
         let full = render_battery(w, h, 100, [255, 255, 255], [255, 255, 255]);
         let empty = render_battery(w, h, 0, [255, 255, 255], [255, 255, 255]);
@@ -318,56 +236,5 @@ mod tests {
         assert!(a(&empty, 24, 0) > 60 && a(&empty, 24, 0) < 160, "garis tepi semi-transparan");
         assert!(a(&empty, w - 2, 12) > 40, "tonjolan kanan");
         assert_eq!(a(&empty, w - 1, 0), 0);
-    }
-
-    use super::*;
-
-    fn alpha(b: &[u8], n: u32, x: u32, y: u32) -> u8 {
-        b[((y * n + x) * 4 + 3) as usize]
-    }
-
-    #[test]
-    fn symmetric_left_right() {
-        let n = 64;
-        let b = render(n, [255, 255, 255]);
-        for y in 0..n {
-            for x in 0..n / 2 {
-                let (l, r) = (alpha(&b, n, x, y) as i32, alpha(&b, n, n - 1 - x, y) as i32);
-                assert!((l - r).abs() <= 2, "({x},{y}) {l} vs {r}");
-            }
-        }
-    }
-
-    #[test]
-    fn has_solid_core_soft_edges_and_empty_corners() {
-        let n = 96;
-        let b = render(n, [255, 255, 255]);
-        assert_eq!(alpha(&b, n, 1, 1), 0);
-        assert_eq!(alpha(&b, n, n - 2, n - 2), 0);
-        assert!(alpha(&b, n, n / 2, (0.09 * n as f32) as u32) > 200);
-        assert!(alpha(&b, n, n / 2, (0.91 * n as f32) as u32) > 200);
-        assert!(b.chunks_exact(4).any(|p| p[3] > 20 && p[3] < 235));
-    }
-
-    #[test]
-    fn badge_is_a_hollow_ring() {
-        let n = 96;
-        let b = render_badge(n, [255, 255, 255]);
-        assert_eq!(alpha(&b, n, 1, 1), 0, "sudut luar kosong");
-        assert!(alpha(&b, n, n / 2, 6) > 200, "cincin atas terisi");
-        assert!(alpha(&b, n, 6, n / 2) > 200, "cincin kiri terisi");
-        assert_eq!(alpha(&b, n, n / 2, n / 2), 0, "tengah berlubang (tanpa latar)");
-        for y in 0..n {
-            let (l, r) = (alpha(&b, n, 10, y) as i32, alpha(&b, n, n - 11, y) as i32);
-            assert!((l - r).abs() <= 3);
-        }
-    }
-
-    #[test]
-    fn premultiplied_color() {
-        let b = render(32, [200, 100, 50]);
-        for p in b.chunks_exact(4) {
-            assert!(p[0] <= p[3] && p[1] <= p[3] && p[2] <= p[3]);
-        }
     }
 }

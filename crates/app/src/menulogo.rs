@@ -7,6 +7,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 static GEN: AtomicU32 = AtomicU32::new(0);
 const STEM: &str = "menu_logo";
 const EXTS: [&str; 9] = ["png", "jpg", "jpeg", "bmp", "ico", "gif", "webp", "tif", "tiff"];
+const DEFAULT_LOGO: &[u8] = include_bytes!("../../../assets/logo.png");
 
 fn file_for(ext: &str) -> PathBuf {
     paths::config_dir().join(format!("{STEM}.{ext}"))
@@ -51,6 +52,20 @@ pub fn bitmap(px: u32, rgb: [u8; 3]) -> Option<Bitmap> {
     let p = path()?;
     let b = nacre_platform::wic::decode_file_fit(&p.to_string_lossy(), (px * 4).max(64))?;
     Some(fit(trim(template(b, rgb)), (px as f32 * 1.3) as u32, px))
+}
+
+pub fn default_bitmap(px: u32, rgb: [u8; 3]) -> Option<Bitmap> {
+    let b = nacre_platform::wic::decode_square(DEFAULT_LOGO, (px * 4).max(64))?;
+    Some(fit(trim(template(b, rgb)), (px as f32 * 1.3) as u32, px))
+}
+
+pub fn start_tile(px: u32, plates: bool) -> Option<Vec<u8>> {
+    let b = nacre_platform::wic::decode_square(DEFAULT_LOGO, px.max(16))?;
+    Some(if plates {
+        nacre_core::iconplate::dark_plate(&b.bgra, b.w)
+    } else {
+        nacre_core::iconplate::free(&b.bgra, b.w)
+    })
 }
 
 pub fn trim(b: Bitmap) -> Bitmap {
@@ -209,5 +224,18 @@ mod tests {
         let out = template(bmp(&[[255, 255, 255, 255], [0, 0, 0, 255]]), [10, 20, 30]);
         assert_eq!(&out.bgra[0..4], &[0, 0, 0, 0]);
         assert_eq!(&out.bgra[4..8], &[30, 20, 10, 255]);
+    }
+
+    #[test]
+    fn embedded_breezeos_logo_decodes_for_rail_and_start() {
+        unsafe {
+            use windows::Win32::System::Com::{CoInitializeEx, COINIT_MULTITHREADED};
+            let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+        }
+        let rail = default_bitmap(24, [255, 255, 255]).expect("default_bitmap");
+        assert!(rail.w > 0 && rail.h == 24);
+        assert!(rail.bgra.chunks_exact(4).any(|p| p[3] > 200));
+        let tile = start_tile(64, true).expect("start_tile");
+        assert_eq!(tile.len(), 64 * 64 * 4);
     }
 }

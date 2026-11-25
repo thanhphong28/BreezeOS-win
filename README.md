@@ -1,522 +1,277 @@
 <p align="center">
-  <img src="assets/logo-rounded.png" alt="BreezeOS" width="200">
+  <img src="assets/logo.png" alt="BreezeOS" width="180">
 </p>
 
 <h1 align="center">BreezeOS</h1>
 
+<p align="center">
+  <b>Giao diện kính mờ hiện đại cho Windows 11 — nhẹ, mượt và thuần bản địa (Native Rust).</b><br>
+  Deck · Visor · Thanh Rail · Quick Panel · Tìm kiếm nhanh · Scene · Tiện ích màn hình — chỉ khoảng ~15 MB RAM khi chạy nền.
+</p>
+
+<p align="center">
+  <a href="https://github.com/thanhphong28/BreezeOS-win/releases"><img alt="Lượt tải" src="https://img.shields.io/github/downloads/thanhphong28/BreezeOS-win/total?label=l%C6%B0%E1%BB%A3t%20t%E1%BA%A3i&color=brightgreen"></a>
+  <img alt="Windows 11" src="https://img.shields.io/badge/Windows-11-0078D4?logo=windows11&logoColor=white">
+  <img alt="Phiên bản" src="https://img.shields.io/badge/phi%C3%AAn%20b%E1%BA%A3n-1.0.0-0a84ff">
+  <img alt="Rust" src="https://img.shields.io/badge/Vi%E1%BA%BFt%20b%E1%BA%B1ng-Rust-orange?logo=rust">
+  <img alt="Ngôn ngữ" src="https://img.shields.io/badge/Ng%C3%B4n%20ng%E1%BB%AF-Ti%E1%BA%BFng%20Vi%E1%BB%87t%20%C2%B7%20English-purple">
+  <img alt="Quyền riêng tư" src="https://img.shields.io/badge/thu%20th%E1%BA%ADp%20d%E1%BB%AF%20li%E1%BB%87u-kh%C3%B4ng-success">
+</p>
+
+<p align="center">
+  <a href="https://github.com/thanhphong28/BreezeOS-win/releases">Tải xuống</a> ·
+  <a href="#-giới-thiệu-breezeos">Giới thiệu</a> ·
+  <a href="#-thiết-kế-mô-đun">Mô-đun</a> ·
+  <a href="#-cài-đặt">Cài đặt</a> ·
+  <a href="#-hướng-dẫn-sử-dụng">Hướng dẫn</a> ·
+  <a href="#-quyền-riêng-tư">Quyền riêng tư</a> ·
+  <a href="#-công-nghệ-cốt-lõi">Công nghệ</a> ·
+  <a href="#-build-từ-mã-nguồn">Build</a>
+</p>
+
 > [!WARNING]
-> **Early Access.** BreezeOS is still in active development. Things can break, look unfinished or change between versions,
-> and some settings may move or reset in a later release. Please [report bugs and ideas](https://github.com/thanhphong28/BreezeOS-win/issues)
-> — every report helps. BreezeOS 0.5 and later can update itself (*Settings → General → About*).
+> **Phiên bản Truy cập sớm (Early Access).** BreezeOS đang được phát triển tích cực bởi **Nguyễn Thanh Phong (Breeze Boy)**. Một số chi tiết giao diện hoặc thiết lập có thể thay đổi giữa các bản cập nhật. Nếu gặp lỗi hoặc có ý tưởng đóng góp, hãy gửi tại trang [Issues](https://github.com/thanhphong28/BreezeOS-win/issues). BreezeOS hỗ trợ cập nhật tự động ngay trong ứng dụng (*Cài đặt → Chung → Giới thiệu*).
 
 > [!IMPORTANT]
-> **Disclaimer.** BreezeOS is an independent, fan‑made project. It is **not affiliated with, endorsed by or sponsored by
-> Apple Inc.** in any way. BreezeOS uses its own names (Deck, Visor, Rail, Scene, Quick Search, Quick Panel, Crystal and so on).
-> “Apple”, “macOS”, “Tahoe”, “Liquid Glass”, “Dynamic Island”, “Stage Manager”, “Mission Control”, “Spotlight”,
-> “Launchpad”, “AirDrop”, “AirPlay” and related names are trademarks of Apple Inc. BreezeOS ships no Apple code, icons,
-> fonts or other assets.
+> **Tuyên bố miễn trừ trách nhiệm.** BreezeOS là dự án độc lập, **không liên kết, không được tài trợ hay chứng nhận bởi Apple Inc. hoặc Microsoft Corporation**. BreezeOS sử dụng hệ thống tên gọi riêng (*Deck, Visor, Rail, Scene, Quick Search, Quick Panel, Crystal...*) và không chứa bất kỳ mã nguồn, biểu tượng, phông chữ hay tài nguyên độc quyền nào của bên thứ ba.
+
+---
+
+## ✨ Giới thiệu BreezeOS
+
+**BreezeOS** khoác lên Windows 11 một không gian làm việc tinh gọn, hiện đại với chất liệu kính mờ (Frosted Glass & Crystal) cùng chuyển động đàn hồi mượt mà trên GPU:
+
+- **Deck** — Thanh ứng dụng nổi với hiệu ứng phóng đại khi di chuột, xem trước cửa sổ trực tiếp (live preview), ngăn xếp Tải xuống và Thùng rác kính.
+- **Visor & Viên nang (Capsule)** — Đảo thông tin tương tác ở cạnh trên màn hình: phát nhạc kèm lời bài hát đồng bộ thời gian thực, sóng nhạc & hiệu ứng cực quang theo bìa đĩa, theo dõi tiến trình tải xuống, kệ tệp kéo-thả, gửi tệp sang điện thoại qua mã QR, phiên tập trung (Pomodoro), công việc & lời nhắc, và nhắc lịch họp.
+- **Thanh Rail** — Thanh menu phía trên cùng tích hợp logo BreezeOS, thực đơn ứng dụng thông minh (File, Edit, View...), trạng thái Wi‑Fi, pin, Tìm kiếm nhanh, Quick Panel và đồng hồ.
+- **Bảng điều khiển nhanh (Quick Panel)** — Trung tâm điều khiển dạng kính cho phép kéo-thả sắp xếp và nắm góc co giãn kích thước từng ô điều khiển.
+- **Tìm kiếm nhanh (Quick Search)**, **Scene**, **Tổng quan (Overview)**, **Lưới ứng dụng (App Grid)** và **Tiện ích màn hình (Widgets)**.
+
+Toàn bộ chương trình là một tệp thực thi thuần bản địa duy nhất viết bằng **Rust**: không Electron, không WebView, không dịch vụ chạy ngầm nặng nề, không yêu cầu tài khoản. Khi ở trạng thái nghỉ, BreezeOS chỉ tiêu thụ khoảng **15 MB RAM**.
 
 <p align="center">
-  <b>A modern glass desktop for Windows 11.</b><br>
-  Deck · Visor · Rail · Quick Panel · Quick Search · Scene · Widgets — native, written in Rust, about 15 MB of RAM.
+  <img src="assets/screenshots/desktop.png" alt="Màn hình BreezeOS với Deck, thanh Rail, Visor và Tiện ích màn hình" width="900">
 </p>
 
-<p align="center">
-  <a href="https://github-release-stats.ghostbyte.dev/thanhphong28/BreezeOS-win"><img alt="Total downloads" src="https://img.shields.io/github/downloads/thanhphong28/BreezeOS-win/total?label=downloads&color=brightgreen"></a>  <img alt="Windows 11" src="https://img.shields.io/badge/Windows-11-0078D4?logo=windows11&logoColor=white">
-  <img alt="Status" src="https://img.shields.io/badge/status-early%20access-orange">
-  <img alt="Rust" src="https://img.shields.io/badge/Made%20with-Rust-orange?logo=rust">
-  <img alt="License" src="https://img.shields.io/badge/License-PolyForm%20Noncommercial-blue">
-  <img alt="Telemetry" src="https://img.shields.io/badge/data%20collected-none-success">
-  <a href="https://github.com/thanhphong28/BreezeOS-win/"><img alt="Website" src="https://img.shields.io/badge/Website-BreezeOS--win-0a84ff"></a>
-</p>
+### 🌟 Điểm nổi bật trên phiên bản 1.0.0
+
+- **Hỗ trợ trọn vẹn Tiếng Việt & Tiếng Anh**: Chuyển đổi tức thì tại *Cài đặt → Chung → Ngôn ngữ*. Toàn bộ giao diện, lịch, thứ/ngày/tháng, phiên tập trung, menu thanh Rail và trang gửi tệp sang điện thoại đều được bản địa hóa tự nhiên.
+- **Hỗ trợ đa màn hình thông minh**: Tùy chọn màn hình hiển thị riêng cho Deck, Rail, Visor và Tiện ích (*Màn hình chính*, *Màn hình 1*, *Màn hình 2*...) với tỷ lệ DPI độc lập trên từng màn hình; tự động thu về màn hình chính khi rút cáp và khôi phục khi cắm lại.
+- **Mẫu thiết lập (Presets) & Giao diện cộng đồng (`.breezetheme`)**: Đổi phong cách toàn diện chỉ với 1 cú nhấp (*Mặc định, Prism, Neon, Aurora, Stealth, Pixel*) hoặc nhập/xuất tệp giao diện `.breezetheme` an toàn.
+- **Mô-đun Capsule tùy biến**: Tự chọn và sắp xếp các thông tin hiển thị khi Visor nghỉ (lời chào, đồng hồ, ngày tháng, pin, CPU/RAM, mạng Wi‑Fi, sự kiện lịch tiếp theo) theo chế độ luân phiên hoặc song song.
+- **Phiên tập trung & Công việc nhanh**: Chu kỳ làm việc/nghỉ ngơi tự động ngay trên Visor, thống kê 7 ngày, và tạo nhanh công việc/nhắc nhở bằng phím tắt `Ctrl + Alt + N`.
+- **Thao tác nhanh trên tệp & Bộ nhớ tạm nâng cao**: Kéo thả ảnh/tệp vào Visor để thu nhỏ ảnh 50%, đổi sang JPG/PNG hoặc nén ZIP ngay tại chỗ; lưu lịch sử bộ nhớ tạm kèm ảnh thu nhỏ, mã màu, ghim mục quan trọng, tạo mã QR và chấm màu màn hình.
 
 <p align="center">
-  <a href="https://github.com/thanhphong28/BreezeOS-win/">Website</a> ·
-  <a href="#-install">Install</a> ·
-  <a href="#-how-to-use-each-feature">How to use</a> ·
-  <a href="#-modular-turn-off-what-you-dont-want">Modular</a> ·
-  <a href="#-privacy">Privacy</a> ·
-  <a href="#-built-with">Built with</a> ·
-  <a href="#-build-from-source">Build</a>
+  <img src="assets/screenshots/visor-modules.png" alt="Mô-đun Capsule hiển thị song song đồng hồ và trạng thái CPU/RAM" width="440">
 </p>
 
 ---
 
-## ✨ What is BreezeOS?
+## 🧩 Thiết kế mô-đun
 
-BreezeOS turns Windows 11 into a clean, modern desktop:
+Mọi thành phần của BreezeOS đều hoạt động độc lập — bạn có thể bật chỉ những phần mình thích và tắt phần còn lại bất cứ lúc nào:
 
-- a magnifying **Deck** for your apps,
-- a **Visor** at the top of the screen that shows what is going on (music with live lyrics, downloads, timers, files),
-- a **Rail** with real app menus, Wi‑Fi and battery,
-- a **Quick Panel** for toggles and sliders, **Quick Search**, **Scene**, **Overview** and desktop **Widgets**,
-
-all drawn with a frosted glass material and springy animations.
-
-It is one small native program: no Electron, no web view, no background services, no account. At idle it uses about
-**15 MB** of private memory.
-
-<p align="center">
-  <img src="assets/screenshots/desktop.png" alt="BreezeOS desktop: Deck, Rail, Visor and widgets" width="900">
-</p>
-
-### 🆕 New in 1.0.0
-
-- **Español**: BreezeOS now speaks Spanish (*Settings → General → Language*). The whole interface is translated, including
-  dates, the calendar, Focus sessions, tasks, the Rail app menus and the Send to phone page. Thanks to
-  [itssebxs](https://github.com/itssebxs) for this community contribution!
-- The Visor size slider is now labelled **Visor size**, so it no longer shares its name with the Deck's size group.
-- Other apps' own menus in the Rail are shown exactly as the app provides them, in every language.
-
-### 0.6.0
-
-- **More than one screen**: choose where the Deck, Rail, Visor and desktop widgets appear (*Main*, *Screen 1*, *Screen 2*…)
-  under **Show on** in each page of Settings. Unplug a screen and everything moves to the main one; plug it back in and
-  it returns. Mixed scaling (for example 100% and 150%) is handled per screen.
-- **Presets**: one click restyles the Deck, Rail and Visor together — *Default*, *Prism* (bright glass), *Neon* (black with
-  a glowing edge), *Aurora* (soft violet glass), *Stealth* (pure black, minimal) and *Pixel* (retro, square corners,
-  monospace). *Settings → Appearance → Preset*; you can still fine‑tune everything afterwards.
-- **Music visualizer styles** in the Visor: *Bars*, a 16‑band *Spectrum*, *Wave* and *Dots* (*Settings → Visor*).
-- **Focus sessions** in the Visor: pick *Work*, *Study*, *Reading* or your own named session, each with its own focus and
-  break length; four rounds with automatic breaks, a pill when each part ends, sessions that survive a restart, and a
-  *Today* card with your focus minutes and the last 7 days.
-- **Clipboard stack** in Quick Search: images (with thumbnails) and colour codes next to text, and **pins** for things you
-  keep pasting. Only pinned items are saved to disk.
-- **Quick actions**: drop files on the new *Quick actions* zone of the Visor to shrink images by half, convert them to JPG
-  or PNG, or zip anything, saved next to the originals. Quick Search adds *Make a QR code from the clipboard* and *Pick a
-  colour from the screen*.
-- **Meeting companion**: ten minutes before a meeting in your Windows Calendar the Visor shows a countdown and a **Join**
-  button when the event has a Meet, Zoom or Teams link; during the meeting it shows the time and whether your mic or
-  camera is on.
-- **Capsule modules**: choose what the idle Visor and Capsule show (greeting, clock, date, battery, CPU and RAM, Wi‑Fi
-  network and your next calendar event), put them in any order, and show them one at a time or **side by side** (the
-  first module stays on the left while the others take turns on the right). Add an accent dot or a soft edge glow
-  (*Settings → Visor → Capsule modules*).
-- **Community themes**: share your look as a small `.breezetheme` text file and apply themes from others in one click
-  (*Settings → Appearance → Community themes*). A theme can only set appearance options (preset, accent colour, font,
-  visualizer, transparency, corners, glow, motion, decoration and Capsule modules). Every file is checked first: unknown
-  keys are ignored and named, numbers are kept in range, and nothing in a theme is ever run, opened or downloaded.
-- **Sturdier on more PCs**: Quick Search and Settings open on the screen your mouse is on, window animations work on
-  every screen, external monitors get real brightness through DDC/CI (or software dimming on each screen), the Visor fits
-  narrow portrait screens, YouTube thumbnails are no longer squashed into the album square, files on slow network
-  drives no longer freeze the Visor shelf, and BreezeOS recovers by itself when the graphics driver resets or a laptop
-  switches GPUs.
-- **Smart Deck reacts right away**: when you switch to another app the Deck now hides at once, even while other
-  windows keep popping up in the background.
-- **Volume keys**: the volume up, down and mute keys now show only BreezeOS's glass HUD; the Windows volume bar no longer
-  pops up on top of it.
-- **Sensitivity**: choose *Quick* or *Relaxed* for the Deck, Rail and Visor. *Relaxed* waits about half a second at the
-  screen edge, so they no longer pop up when the mouse just passes by; *Quick* also opens the Visor faster.
-- **Fonts**: Inter, Segoe UI, Bahnschrift or a monospace font, applied after a one‑click restart, plus **Reduce motion**
-  to keep the visualizer, Aurora light and Visor morph still (*Settings → Appearance → Text and motion*).
-
-<p align="center">
-  <img src="assets/screenshots/notch-focus.png" alt="Focus session in the Visor" width="560">
-  <img src="assets/screenshots/notch-quick-actions.png" alt="Quick actions card in the Visor" width="560">
-</p>
-<p align="center">
-  <img src="assets/screenshots/visor-modules.png" alt="Capsule modules side by side: clock with an accent dot, CPU and RAM" width="440">
-</p>
-<p align="center">
-  <img src="assets/screenshots/settings-presets.png" alt="Appearance settings with presets" width="400">
-  <img src="assets/screenshots/settings-themes.png" alt="Community themes with validation status" width="400">
-</p>
-<p align="center">
-  <img src="assets/screenshots/settings-capsule.png" alt="Capsule modules settings" width="400">
-</p>
-
-### 0.5.0
-
-- **Built‑in updates**: BreezeOS checks GitHub for a new release, shows it in the Visor and installs it with one click
-  (*Settings → General → About*). The installer is checked against its SHA‑256 fingerprint before it runs.
-- **Tasks & reminders**: press `Ctrl` + `Alt` + `N` (or **Add a task** in the Visor), type `15:30 meeting`,
-  `10m stretch` or `tomorrow 08:00 report` right in the Visor and press Enter. The new **Tasks** page lists them, and
-  reminders pop up in the Visor when they are due.
-- **Visor pills**: short notices when Bluetooth earbuds, a mouse or a USB drive connects or disconnects.
-- **Aurora**: while music plays, soft waves of light in the colours of the album art move along the bottom of the Visor
-  and Capsule and rise with the bass, mids and treble — the Visor now has real depth.
-- **A fresh look for the open Visor**: a two‑tone page title, the date and time in the middle, page dots instead of tabs,
-  a colour for every page and no more grey boxes.
-- **Visor & Capsule**: adjustable **size**, adjustable **distance from the top edge** for the Capsule, and a springy
-  “water drop” animation when switching between them. **Send** now has a **Cancel** button.
-- **Rail**: a **behaviour** setting like the Deck’s (Fixed · Overlay · Smart), **menus that match the app**
-  (browsers, File Explorer, Office, code editors, Spotify), *About* opens the app’s own details, *Help → BreezeOS Guide*
-  opens the guide, and Store apps show their real names.
-- **Fullscreen**: the Rail, Visor and Deck now hide during fullscreen videos and games.
-- **Fixes**: the Windows taskbar stays hidden after a restart, maximized apps no longer get an extra gap under the Rail,
-  the Smart Visor reappears at the top edge reliably, and the Visor follows the app that is actually playing music.
-- **Fixes from your reports**:
-  - BreezeOS starts right after sign‑in instead of minutes later;
-  - no more cursor stutter or freezes from BreezeOS’s input hooks;
-  - brightness works on laptops where Windows can’t set it, using a gentle software dimmer instead;
-  - Task Manager, Calculator and Notepad open again from BreezeOS;
-  - smoother minimize and restore animations;
-  - the Clock widget category shows a clock;
-  - Settings closes with ✕ or `Esc`;
-  - the tray icon opens Settings with a left click;
-  - Quick Panel sliders follow the pointer all the way to both ends;
-  - Settings → Appearance explains why the Deck looks solid when Windows transparency or battery saver is on.
-
-<details>
-<summary><b>In 0.4.1</b></summary>
-
-- **New look out of the box**: a fresh install now starts with the Rail, Visor and Deck together, with an auto‑hiding
-  Deck. Settings you already changed are kept.
-- **Fixes**: the Visor battery percentage keeps updating instead of freezing after the first reading, and the Wi‑Fi and
-  Bluetooth controls in the Quick Panel open their menus again instead of closing straight away.
-</details>
-
-<details>
-<summary><b>In 0.4.0</b></summary>
-
-- **Desktop widgets**: Clock, World Clock, Today, Month, Digital Clock, Battery and System Monitor, in the **Original** or
-  **Crystal** material. Add them from a widget gallery; they snap to a tidy grid with a placeholder while you drag.
-- **Capsule**: an optional floating, pill‑shaped Visor.
-- **Global scale** (100 · 125 · 150%) for the Deck, Visor, Rail and Quick Panel.
-- **Quick Panel editing**: drag controls to rearrange them (neighbours slide out of the way) and drag the glass corner
-  handle to resize any control — Wi‑Fi down to a single circle, sliders vertical or wide, Playing from a play button up
-  to a large card.
-- **Wi‑Fi**: connect to your saved networks without location access, live signal strength, and new Wi‑Fi and battery icons
-  in the Rail with the battery percentage inside, outside or hidden.
-- **Windows** open and close with an animation; Scene cards fly in from where they sit.
-- **Settings** redesigned with a floating glass sidebar, and your own image as the Rail logo.
-- **Own names** for every part: Deck, Visor, Rail, Scene, Quick Search, Quick Panel, Overview and App Grid.
-- **Fixes**: Deck pins survive app updates (Microsoft Store and auto‑updating apps), closed apps can be removed from the
-  Deck, opening apps no longer freezes BreezeOS, the Visor and Deck always stay above other windows, and text can no longer be
-  garbled by third‑party fonts.
-- **Lighter**: about a third of the memory of the previous development build.
-</details>
-
-<details>
-<summary><b>In 0.3.0</b></summary>
-
-- A brand‑new Visor with **Play**, **Shelf** and **Timer** tabs, live lyrics, a music idle mode and download progress.
-- **Send to phone**: drop files on the Visor and scan a QR code with any Android or iPhone.
-- Wi‑Fi and Bluetooth pickers, the BreezeOS app icon and a **Buy me a coffee** button.
-</details>
-
----
-
-## 🧩 Modular: turn off what you don’t want
-
-Every part of BreezeOS is independent. Keep only the pieces you like:
-
-| Part | Where to turn it off |
+| Thành phần | Vị trí bật / tắt |
 |---|---|
-| Deck | *Settings → Deck → Enable Deck* |
-| Visor | *Settings → Visor → Enable Visor* |
-| Rail | *Settings → Rail → Enable Rail* |
-| Widgets | Right‑click a widget → *Remove Widget* |
-| Scene | *Settings → Scene*, or the Quick Panel control |
-| Screen Corners | *Settings → Screen Corners* (set each corner to “None”) |
-| Windows taskbar | *Settings → General → Hide the Windows taskbar* (turn off to keep your taskbar) |
-| Window animations | *Settings → General → Window animations* |
-| Recent apps in the Deck | *Settings → Deck → Recent apps* |
-
-Use only the Deck with your normal taskbar, only the Visor, only the Rail — any mix works.
+| **Thanh Deck** | *Cài đặt → Deck → Bật thanh Deck* |
+| **Visor** | *Cài đặt → Visor → Bật Visor* |
+| **Thanh Rail** | *Cài đặt → Rail → Bật thanh Rail* |
+| **Tiện ích màn hình** | Nhấp chuột phải vào tiện ích → *Xóa tiện ích* |
+| **Scene** | *Cài đặt → Scene* hoặc nút bật nhanh trong Quick Panel |
+| **Góc màn hình** | *Cài đặt → Góc màn hình* (đặt từng góc thành *Không có*) |
+| **Thanh tác vụ Windows** | *Cài đặt → Chung → Ẩn thanh tác vụ Windows* (tắt nếu muốn giữ Taskbar gốc) |
+| **Hoạt ảnh cửa sổ** | *Cài đặt → Chung → Hoạt ảnh cửa sổ (thu nhỏ, đóng, mở)* |
+| **Ứng dụng gần đây trên Deck** | *Cài đặt → Deck → Ứng dụng dùng gần đây* |
 
 ---
 
-## 🚀 Install
+## 🚀 Cài đặt
 
-> Requires **Windows 11** (build 22000 or newer), 64‑bit.
+> Yêu cầu **Windows 11** (build 22000 trở lên), 64‑bit (`x64`).
 
-Download from the **[Releases](https://github.com/thanhphong28/BreezeOS-win/releases)** page, or from the **[BreezeOS website](https://github.com/thanhphong28/BreezeOS-win/)**, which always links to the latest version:
+Tải bản phát hành mới nhất tại trang **[Releases](https://github.com/thanhphong28/BreezeOS-win/releases)**:
 
-| File | Best for |
+| Tệp tải về | Khuyên dùng cho |
 |---|---|
-| `BreezeOS-Setup-1.0.0.exe` | Most people. Per‑user install, **no administrator rights**, optional Start menu shortcut and “launch at sign‑in”, clean uninstall from *Windows Settings → Apps*. |
-| `BreezeOS-1.0.0-win-x64.zip` | Portable. Extract anywhere and keep `breezeos.exe`, `breezeos-guard.exe` and the `fonts` folder **together**. |
+| `BreezeOS-Setup-1.0.0.exe` | **Đa số người dùng.** Cài đặt theo tài khoản người dùng (không cần quyền Quản trị viên / Admin), tùy chọn tạo lối tắt Start Menu và khởi động cùng Windows, hỗ trợ tự động cập nhật và gỡ cài đặt sạch qua *Cài đặt Windows → Ứng dụng*. |
+| `BreezeOS-1.0.0-win-x64.zip` | **Bản chạy ngay (Portable).** Giải nén vào bất kỳ thư mục nào và giữ `breezeos.exe`, `breezeos-guard.exe` cùng thư mục `fonts` nằm chung với nhau. |
 
-### Installer
+### Cài đặt bằng bộ cài `.exe`
 
-1. Run `BreezeOS-Setup-1.0.0.exe`.
-2. Windows SmartScreen may warn about an unsigned app: choose **More info → Run anyway** (only for files from this repository).
-3. Pick the options you want (Start menu shortcut, launch at sign‑in) and finish. BreezeOS starts.
+1. Chạy `BreezeOS-Setup-1.0.0.exe`.
+2. Nếu Windows SmartScreen hiển thị cảnh báo ứng dụng chưa ký số thương mại, chọn **More info → Run anyway** (chỉ thực hiện với tệp tải trực tiếp từ kho lưu trữ chính thức này).
+3. Chọn tùy chọn mong muốn (tạo lối tắt Start Menu, khởi động cùng Windows) và hoàn tất.
 
-### “My antivirus says it’s a virus”
+### Lưu ý về cảnh báo nhầm của phần mềm diệt virus (False Positive)
 
-Some antivirus engines flag BreezeOS (for example on VirusTotal). It’s a **false positive**: BreezeOS is unsigned, new, and does
-things that look unusual to a heuristic scanner, because a desktop shell has to do them — hiding the taskbar, a keyboard hook for
-Alt+Tab, moving other apps’ windows, and starting at sign‑in. There is no telemetry and the full source is in this repository.
+Một số trình quét heuristic có thể cảnh báo nhầm do tệp thực thi chưa có chứng chỉ EV Code Signing đắt đỏ và thực hiện các tác vụ đặc thù của một desktop shell (ẩn thanh Taskbar, bắt tổ hợp phím `Alt+Tab`, di chuyển cửa sổ khi bật Scene, đăng ký chạy khi đăng nhập). Toàn bộ mã nguồn đều công khai minh bạch tại kho lưu trữ này và hoàn toàn không có mã thu thập dữ liệu.
 
-To make sure your copy is the real one:
+Để tự kiểm tra tính toàn vẹn của tệp cài đặt:
 
-1. Download only from the **[Releases](https://github.com/thanhphong28/BreezeOS-win/releases)** page of this repository.
-2. In PowerShell run `Get-FileHash .\BreezeOS-Setup-1.0.0.exe -Algorithm SHA256` and compare the result with the
-   **sha256** shown next to the file on the Releases page. They must match exactly.
-3. If you prefer, build BreezeOS yourself from source (see below).
+```powershell
+Get-FileHash .\BreezeOS-Setup-1.0.0.exe -Algorithm SHA256
+```
 
-If Windows Defender quarantines the file, you can restore it from *Windows Security → Virus & threat protection →
-Protection history*, but only after the fingerprint check above matches.
+Đối chiếu kết quả với mã **SHA‑256** công bố trên trang Releases — hoặc bạn có thể tự biên dịch trực tiếp từ mã nguồn theo hướng dẫn bên dưới.
 
-### Portable
+### Khởi chạy lần đầu & Gỡ cài đặt
 
-1. Extract the zip to a folder you keep, for example `Documents\BreezeOS`.
-2. Double‑click `breezeos.exe`.
-
-### First run
-
-- The Windows taskbar hides and the Rail, Visor and Deck appear. The Deck hides itself until you move the pointer to the
-  bottom of the screen (turn the takeover off in *Settings → General* if you prefer your taskbar).
-- Open **Settings**: right‑click the Deck → **BreezeOS Settings…**, or click the logo in the Rail.
-- Language: *Settings → General → Language* (**English**, **Indonesia** or **Español**).
-
-### Updating from an older version
-
-Install 1.0.0 over the old version. Your settings, pinned apps and Quick Panel layout are kept. From 0.5.0 on, BreezeOS
-offers new versions itself.
-
-### Quit and uninstall
-
-- **Quit**: right‑click an empty part of the Deck (or the Start icon) → **Quit BreezeOS**. The taskbar comes back automatically.
-  If BreezeOS is ever killed, `breezeos-guard.exe` restores the taskbar and any windows it moved.
-- **Uninstall**: *Windows Settings → Apps → Installed apps → BreezeOS → Uninstall* (installer), or quit BreezeOS and delete the folder
-  (portable). Your settings are in `%APPDATA%\BreezeOS`; delete that folder too for a clean removal.
+- **Khởi chạy lần đầu**: Taskbar mặc định sẽ ẩn đi, thay bằng **Thanh Rail**, **Visor** và **Deck**. Mở **Cài đặt** bằng cách nhấp chuột phải vào vùng trống trên Deck → **Cài đặt BreezeOS…**, nhấp trái vào biểu tượng BreezeOS dưới khay hệ thống (System Tray), hoặc mở từ menu logo BreezeOS trên thanh Rail.
+- **Đổi ngôn ngữ**: Vào *Cài đặt → Chung → Ngôn ngữ* → chọn **Vietnamese** (Tiếng Việt) hoặc **English**.
+- **Thoát an toàn**: Nhấp chuột phải vào vùng trống trên Deck hoặc nút Start → **Thoát BreezeOS**. Thanh Taskbar Windows sẽ tự động khôi phục ngay lập tức (kể cả khi tiến trình bị buộc dừng nhờ trình bảo vệ `breezeos-guard.exe`).
+- **Gỡ cài đặt**: Gỡ từ *Windows Settings → Apps → Installed apps → BreezeOS* (với bản Setup) hoặc thoát ứng dụng rồi xóa thư mục (với bản Portable). Xóa thêm `%APPDATA%\BreezeOS` nếu muốn xóa sạch toàn bộ cấu hình cá nhân.
 
 ---
 
-## 📖 How to use each feature
+## 📖 Hướng dẫn sử dụng
 
 <details open>
-<summary><b>🎛 Deck</b></summary>
+<summary><b>🎛 Thanh Deck</b></summary>
 
-- **Open / switch apps**: click an icon. Running apps have a dot. Hover to magnify; hover a running app for live window previews.
-- **Keep / remove**: right‑click an app → *Keep in Deck* / *Remove from Deck*. Drag icons to reorder.
-- **Recent apps** you closed appear on the right; right‑click → *Remove from Deck*, or turn them off in *Settings → Deck*.
-- **Close an app**: right‑click it → **Close**. **Quit BreezeOS** appears when you right‑click an empty area or the Start icon.
-- **Minimize** a window and it flies into the Deck with a **Funnel** (or **Scale**) effect.
-- **App Grid** button, a **Downloads** stack and a glass **Trash** (right‑click → *Empty Trash*).
-- **Custom icons**: right‑click an app → *Change icon…*.
-- **Size, magnification, behaviour (Fixed · Overlay · Smart)**: *Settings → Deck*.
+- **Mở & chuyển đổi ứng dụng**: Nhấp vào biểu tượng ứng dụng. Ứng dụng đang chạy có chấm sáng phía dưới; di chuột để phóng đại mượt mà và xem trước cửa sổ trực tiếp.
+- **Ghim & sắp xếp**: Nhấp chuột phải → *Ghim vào Deck* / *Gỡ khỏi Deck*, hoặc kéo thả để đổi vị trí biểu tượng.
+- **Thu nhỏ cửa sổ**: Hiệu ứng thu phễu (*Funnel*) hoặc thu phóng (*Thu phóng*) bay mượt vào Deck.
+- **Tiện ích tích hợp**: Nút **Bắt đầu** mang biểu tượng BreezeOS, **Lưới ứng dụng**, **Ngăn xếp Tải xuống** và **Thùng rác** (nhấp chuột phải → *Dọn sạch Thùng rác*).
+- **Biểu tượng tùy chỉnh**: Nhấp chuột phải vào bất kỳ biểu tượng nào → *Đổi biểu tượng…*.
+- **Hành vi linh hoạt**: *Cố định*, *Đè lên*, hoặc *Thông minh* (tự ẩn khi cửa sổ chiếm chỗ) trong *Cài đặt → Deck*.
 </details>
 
 <details open>
-<summary><b>🕳 Visor</b></summary>
+<summary><b>🕳 Visor & Viên nang (Capsule)</b></summary>
 
-The glass pill at the top center of the screen. Choose **Visor** (attached to the top edge) or **Capsule** (floating) in
-*Settings → Visor → Shape*.
-
-<p align="center">
-  <img src="assets/screenshots/visor-capsule.png" alt="The Visor in the Capsule shape" width="480">
-</p>
-
-- **Hover** to peek, **rest the cursor ~0.3 s** (or click) to open the panel. Scroll the mouse wheel to switch tabs.
-- **When idle**: a greeting with the time, date and battery; **music & lyrics** while a song is loaded; or just the pill.
+Đảo kính tương tác nằm giữa cạnh trên màn hình. Có thể chuyển đổi giữa kiểu **Visor** (gắn liền cạnh trên) và **Viên nang / Capsule** (nổi độc lập) tại *Cài đặt → Visor → Hình dạng*.
 
 <p align="center">
-  <img src="assets/screenshots/notch-idle-greeting.png" alt="Visor idle: greeting" width="300">
-  <img src="assets/screenshots/notch-music-lyrics.png" alt="Visor idle: music & lyrics" width="480">
+  <img src="assets/screenshots/visor-capsule.png" alt="Visor ở hình dạng Viên nang nổi" width="480">
 </p>
 
-- **Play tab**: song card (artwork, title, seekable progress, controls) and big **lyrics** that scroll with the song.
-  Put your own `Artist - Title.lrc` files in `%APPDATA%\BreezeOS\lyrics`, or let BreezeOS look them up on [LRCLIB](https://lrclib.net).
+- **Tương tác**: Di chuột qua để hé mở, giữ trỏ chuột ~0,3 giây (hoặc nhấp chuột) để bung toàn bộ bảng Visor. Cuộn con lăn chuột để chuyển giữa các trang.
+- **Khi phát nhạc**: Hiển thị bìa đĩa, thanh tua nhạc, sóng nhạc trực quan (*Cột, Phổ âm, Sóng, Chấm*), dải sáng cực quang theo màu album và **lời bài hát đồng bộ từng câu** (đọc tệp `.lrc` trong `%APPDATA%\BreezeOS\lyrics` hoặc tự tìm qua [LRCLIB](https://lrclib.net)).
 
 <p align="center">
-  <img src="assets/screenshots/notch-play.png" alt="Visor Play tab with song card and lyrics" width="560">
+  <img src="assets/screenshots/notch-music-lyrics.png" alt="Visor hiển thị nhạc và lời bài hát khi ở trạng thái chờ" width="480">
+</p>
+<p align="center">
+  <img src="assets/screenshots/notch-play.png" alt="Trang Phát nhạc trên Visor kèm lời bài hát" width="560">
 </p>
 
-- **Downloads**: Microsoft Store, Steam and browser downloads with a progress ring.
-- **Shelf tab**: drag files onto the Visor and drop them on **Keep on Shelf** · **Send** · **Copy to…** · **Open with…**.
+- **Kệ tệp & Thao tác nhanh**: Kéo tệp thả lên Visor để chọn **Lưu vào Kệ tệp**, **Gửi sang điện thoại** (quét mã QR qua cùng mạng Wi‑Fi cho cả Android & iPhone mà không cần cài thêm app), **Sao chép tới…**, **Mở bằng…** hoặc xử lý ảnh / nén ZIP nhanh.
 
 <p align="center">
-  <img src="assets/screenshots/notch-drop-zones.png" alt="Drop zones when dragging files onto the Visor" width="480">
+  <img src="assets/screenshots/notch-drop-zones.png" alt="Các vùng thả tệp trên Visor" width="480">
 </p>
 
-- **Send to phone (Android & iPhone, no app)**: drop files on **Send**, scan the QR code with your phone’s camera and tap
-  **Download**. Both devices must be on the **same Wi‑Fi**; allow BreezeOS on **Private networks** if Windows Firewall asks.
-
-<p align="center">
-  <img src="assets/screenshots/notch-send-qr.png" alt="Send to phone: QR code and progress" width="560">
-</p>
-
-- **Timer tab**: a timer next to a calendar strip with your Windows calendar events.
-- **Tasks page**: your to‑do list with a big done counter. Click a task to tick it off. **Add a task** (or `Ctrl` + `Alt`
-  + `N`) turns into a text field right in the Visor: type, press Enter to add (and keep typing the next one), Esc to
-  close. A time at the start makes it a reminder: `15:30 …`, `10m …` / `2h …`, `tomorrow 08:00 …`; the Visor shows the
-  time it understood as you type.
-- **Pages**: switch with the dots at the bottom or the mouse wheel. Each page has its own colour.
-- **Pills**: reminders, available updates and connected devices appear briefly in the Visor. Click a pill to act on it,
-  right‑click to dismiss it. Choose which ones you want in *Settings → Visor → Pills & Context*.
-- **Size and Capsule distance**: *Settings → Visor → Visor size* and *Distance from top edge*.
+- **Hẹn giờ, Lịch, Phiên tập trung & Công việc**: Tích hợp đồng hồ đếm ngược, sự kiện Lịch Windows (kèm nút **Tham gia** nhanh trước cuộc họp Meet/Zoom/Teams 10 phút), phiên tập trung Pomodoro và danh sách công việc (`Ctrl + Alt + N` để nhập nhanh như `15:30 họp nhóm`, `10m nghỉ mắt`).
 </details>
 
 <details open>
-<summary><b>📋 Rail</b></summary>
+<summary><b>📋 Thanh Rail</b></summary>
 
-- **Logo menu**: About this PC, System Settings, Microsoft Store, BreezeOS Settings, App Grid, Overview, Force Quit, Sleep,
-  Restart, Shut Down, Lock Screen. Use your own image as the logo in *Settings → Rail → Rail logo*.
-- **App name and menus**: the active app’s real menus (File, Edit…) when it has classic menus; otherwise menus made for
-  the app — tabs and bookmarks in browsers, new folder and view modes in File Explorer, formatting in Office, the command
-  palette in code editors. *About* opens the app’s details and *Help → BreezeOS Guide* opens this guide.
-- **Behaviour**: Fixed (windows stay below the Rail), Overlay, or Smart (hides under maximized windows and comes back
-  when you touch the top edge) in *Settings → Rail*.
-- **Right side**: battery, **Wi‑Fi**, Quick Search, Quick Panel and the clock. The Wi‑Fi icon shows live signal strength;
-  the battery percentage can sit inside the icon, next to it, or be hidden (*Settings → Rail*).
-- **Background**: transparent (with a soft shade), light, dark or the glass material.
-
-
-- **Wi‑Fi menu**: a switch, your **saved networks** (click one to connect) and live signal strength for the current one.
-  Windows only lists *nearby* networks to apps when **Location** is allowed; BreezeOS asks with a button and never reads or
-  stores your location.
-
+- **Menu Logo BreezeOS**: Truy cập nhanh *Giới thiệu về PC này, Cài đặt hệ thống, Microsoft Store, Cài đặt BreezeOS, Lưới ứng dụng, Tổng quan, Buộc thoát, Ngủ, Khởi động lại, Tắt máy, Khóa màn hình, Đăng xuất*. Bạn cũng có thể đổi sang ảnh logo riêng trong *Cài đặt → Rail → Logo thanh Rail*.
+- **Menu ứng dụng đang mở**: Tự động hiển thị thanh menu thật của ứng dụng truyền thống hoặc bộ menu thông minh tương ứng cho trình duyệt, File Explorer, bộ Office, trình soạn thảo mã nguồn...
+- **Cụm trạng thái bên phải**: Pin (tùy chọn phần trăm bên trong, bên ngoài hoặc ẩn), Wi‑Fi (xem cường độ sóng & kết nối nhanh mạng đã lưu), Tìm kiếm nhanh, Quick Panel và Đồng hồ.
 </details>
 
 <details open>
-<summary><b>🎚 Quick Panel</b></summary>
+<summary><b>🎚 Bảng điều khiển nhanh (Quick Panel)</b></summary>
 
-- Click the two‑switch icon in the Rail.
-- **Wi‑Fi / Bluetooth**: click the round icon to switch on/off; click the rest to open the network / device picker.
-  Bluetooth **headphones and speakers connect with one click**.
-- **Display / Sound sliders**, a **sound output** button, Playing, Dark Mode, Scene, Overview, Screenshot and more.
+- Nhấp vào biểu tượng công tắc kép trên thanh Rail để mở.
+- Bật/tắt nhanh **Wi‑Fi**, **Bluetooth** (kết nối tai nghe/loa chỉ với 1 cú nhấp), chỉnh **Độ sáng** (hỗ trợ cả màn hình rời qua DDC/CI hoặc làm dịu bằng phần mềm), **Âm lượng**, chọn thiết bị đầu ra âm thanh, Chế độ tối, Scene, Tổng quan, Chụp màn hình...
 
 <p align="center">
-  <img src="assets/screenshots/quick-panel.png" alt="Quick Panel" width="320">
+  <img src="assets/screenshots/quick-panel.png" alt="Bảng điều khiển nhanh Quick Panel" width="320">
 </p>
 
-- **Edit Controls…**:
-  - remove a control with **−**,
-  - **drag** a control to a new place — the others slide out of the way,
-  - **drag the glass corner handle** horizontally, vertically or diagonally to resize it,
-  - add more from the searchable gallery.
+- **Chỉnh sửa điều khiển…**: Xóa bớt ô bằng nút **−**, kéo để đổi chỗ, nắm **tay cầm kính ở góc** để kéo giãn kích thước từng ô theo chiều ngang/dọc, hoặc thêm điều khiển mới từ thư viện.
 
 <p align="center">
-  <img src="assets/screenshots/quick-panel-edit.png" alt="Quick Panel in Edit Controls mode with resize handles and the gallery" width="820">
+  <img src="assets/screenshots/quick-panel-edit.png" alt="Chế độ chỉnh sửa bố cục và kích thước ô trong Quick Panel" width="820">
 </p>
 </details>
 
 <details open>
-<summary><b>🧱 Widgets</b></summary>
+<summary><b>🧱 Tiện ích màn hình (Widgets)</b></summary>
 
-- Open the gallery from *Settings → Widgets → Add widgets*, or right‑click a widget → *Edit Widgets…*.
-- **Click** a widget in the gallery to add it, or **drag** it onto the desktop; a placeholder shows the grid slot it will snap to.
-- Drag widgets to move them, click one to open the matching app, right‑click → *Remove Widget*.
-- Material: **Original** (solid light and dark cards) or **Crystal** (glass), in *Settings → Widgets*.
-- Widgets only show the time, your calendar date, battery and CPU/memory usage. They read no personal data.
+- Mở thư viện từ *Cài đặt → Tiện ích → Thêm tiện ích* hoặc nhấp chuột phải vào tiện ích trên màn hình → *Chỉnh sửa tiện ích…*.
+- Gồm: *Đồng hồ, Giờ thế giới, Hôm nay, Tháng, Đồng hồ số, Pin* và *Theo dõi hệ thống (CPU/RAM)* với hai chất liệu **Nguyên bản (Original)** hoặc **Pha lê (Crystal)** tự bắt dính theo lưới gọn gàng.
 
 <p align="center">
-  <img src="assets/screenshots/widgets-desktop.png" alt="Widgets in the Original material" width="360">
-  <img src="assets/screenshots/widgets-crystal.png" alt="Widgets in the Crystal material" width="360">
+  <img src="assets/screenshots/widgets-desktop.png" alt="Tiện ích chất liệu Nguyên bản" width="360">
+  <img src="assets/screenshots/widgets-crystal.png" alt="Tiện ích chất liệu Pha lê" width="360">
 </p>
 </details>
 
 <details>
-<summary><b>🔍 Quick Search</b></summary>
+<summary><b>🔍 Tìm kiếm nhanh (Quick Search), 🎬 Scene & 🪟 Tổng quan</b></summary>
 
-- `Ctrl` + `Space` opens it. Type to search **Apps**, **Files**, **Actions** and **Clipboard** (switch with `Ctrl` + `1`…`4`).
-- Built‑in calculator, recent files with thumbnails, file‑type filters and “Show more”.
-- **Actions**: your own quick keys (*Settings → Quick Search*). **Clipboard history** is optional and kept in memory only.
+- **Tìm kiếm nhanh (`Ctrl + Space`)**: Tìm **Ứng dụng**, **Tệp tin**, **Tác vụ** và **Bộ nhớ tạm** (chuyển nhanh bằng `Ctrl + 1…4`), tích hợp máy tính bỏ túi, tạo mã QR từ bộ nhớ tạm và chấm màu màn hình.
 
 <p align="center">
-  <img src="assets/screenshots/quick-search.png" alt="Quick Search" width="560">
+  <img src="assets/screenshots/quick-search.png" alt="Tìm kiếm nhanh Quick Search" width="560">
+</p>
+
+- **Scene**: Biến các cửa sổ nền thành dải thẻ 3D nghiêng trực quan bên cạnh màn hình; nhấp để đưa cửa sổ ra sân khấu chính, `Shift + nhấp` để gom nhóm cửa sổ.
+- **Tổng quan (`Ctrl + ↑`) & Lưới ứng dụng (`Ctrl + Shift + Space`)**: Quan sát toàn bộ cửa sổ đang mở cùng màn hình ảo hoặc duyệt kho ứng dụng theo danh mục.
+
+<p align="center">
+  <img src="assets/screenshots/apps.png" alt="Lưới ứng dụng App Grid" width="560">
 </p>
 </details>
 
-<details>
-<summary><b>🎬 Scene</b></summary>
+### ⌨️ Bảng phím tắt mặc định
 
-- Turn it on from the Quick Panel or *Settings → Scene*.
-- Other windows become **live, tilted cards** in a side strip; click one to fly it back to the stage, Shift‑click to group.
-- Click the wallpaper to tuck everything away. `Alt` + `Tab` shows BreezeOS’s switcher while it is on.
-
-</details>
-
-<details>
-<summary><b>🪟 Overview, App Grid, Screen Corners, HUD</b></summary>
-
-- **Overview** (`Ctrl` + `↑`): every window and your virtual desktops at a glance.
-- **App Grid** (`Ctrl` + `Shift` + `Space` or the Deck button): a full‑screen grid of installed apps.
-- **Screen Corners**: move the pointer into a screen corner to run an action.
-- **Volume & brightness HUD**: a glass card with your output device name.
-
-<p align="center">
-  <img src="assets/screenshots/apps.png" alt="App Grid" width="560">
-</p>
-</details>
-
-<details>
-<summary><b>🎨 Appearance & ⚙️ Settings</b></summary>
-
-- *Settings → Appearance*: Auto · Light · Dark, accent color, icon style (Default · Dark · Clear · Tinted), the glass
-  material (**Blur**, **Crystal** or **Black**), a separate Visor material, blur, transparency, the **scale** of the Deck,
-  Visor, Rail and Quick Panel, and an optional **icon pack** (`%APPDATA%\BreezeOS\iconpack`, nothing is bundled).
-- Settings has a floating glass sidebar with search, back / forward buttons, English and Indonesian.
-- **Quick shortcuts**: `` Alt+` `` cycles windows of the same app, `Ctrl+Alt+H` hides, `Ctrl+Alt+M` minimizes,
-  `Ctrl+Alt+Q` quits the active app (*Settings → General*).
-
-<p align="center">
-  <img src="assets/screenshots/settings.png" alt="BreezeOS Settings" width="640">
-</p>
-</details>
-
-### Keyboard shortcuts
-
-| Shortcut | Action |
+| Tổ hợp phím | Chức năng |
 |---|---|
-| `Ctrl` + `Space` | Quick Search |
-| `Ctrl` + `Shift` + `Space` | App Grid |
-| `Ctrl` + `1` … `4` | Inside Quick Search: Apps · Files · Actions · Clipboard |
-| `Ctrl` + `Alt` + `N` | Add a task or reminder |
-| `Ctrl` + `↑` | Overview |
-| `Alt` + `Tab` | BreezeOS window switcher (while Scene is on) |
-| `Esc` | Close the active overlay |
-
-The complete guide in Indonesian is in [`docs/PANDUAN.md`](docs/PANDUAN.md).
-
----
-
-## 🔒 Privacy
-
-**BreezeOS does not collect, store or send any data about you.** There is no telemetry, no analytics, no account and no ads.
-Everything BreezeOS knows stays on your PC, in `%APPDATA%\BreezeOS`.
-
-- **Lyrics**: if a song has no local `.lrc` file, BreezeOS asks [LRCLIB](https://lrclib.net) using only the title, artist,
-  album and length. You can turn it off (*Settings → Visor*).
-- **Update check**: about once every 12 hours BreezeOS reads the public list of releases from `api.github.com`. Nothing about
-  you is sent. Turn it off in *Settings → General → About*. Updates are only downloaded when you click **Update**.
-- **Tasks** are stored on your PC in `%APPDATA%\BreezeOS\todo.txt`.
-- **Send to phone** runs a tiny temporary web server on your **local network only**, under a random link, serving only the files
-  you dropped. It stops when you click Cancel, after 15 idle minutes, or when BreezeOS quits.
-- **Read‑only, on demand**: saved Wi‑Fi network names and signal strength, Bluetooth devices, calendar events, download
-  progress (file names and sizes only), and which apps use the microphone / camera. BreezeOS never reads your location.
-- **Clipboard history** is optional, text only, kept in memory for 8 hours and never written to disk.
-- A keyboard hook is used **only** to catch `Alt+Tab` while Scene is on. Keystrokes are never logged or sent.
-- Release builds are checked so that they contain no paths or user names from the developer’s PC.
+| `Ctrl` + `Space` | Mở Tìm kiếm nhanh (Quick Search) |
+| `Ctrl` + `Shift` + `Space` | Mở Lưới ứng dụng (App Grid) |
+| `Ctrl` + `1` … `4` | Chuyển thẻ trong Tìm kiếm nhanh: *Ứng dụng · Tệp tin · Tác vụ · Bộ nhớ tạm* |
+| `Ctrl` + `Alt` + `N` | Thêm nhanh công việc hoặc lời nhắc trên Visor |
+| `Ctrl` + `↑` | Mở Tổng quan cửa sổ (Overview) |
+| `` Alt` + `` ` `` | Chuyển nhanh giữa các cửa sổ của cùng một ứng dụng |
+| `Ctrl` + `Alt` + `H` / `M` / `Q` | Ẩn / Thu nhỏ / Thoát ứng dụng đang hoạt động |
+| `Alt` + `Tab` | Bộ chuyển cửa sổ kính của BreezeOS (khi đang bật Scene) |
+| `Esc` | Đóng lớp phủ hoặc hộp thoại đang mở |
 
 ---
 
-## 🛠 Built with
+## 🔒 Quyền riêng tư
 
-- **[Rust](https://www.rust-lang.org)** — the whole app, in five crates.
-- **[windows‑rs](https://github.com/microsoft/windows-rs)** — direct access to Win32 and WinRT APIs.
-- **Windows.UI.Composition** — GPU‑composited visuals, springs and blur for the glass materials and all animations, with
-  one shared graphics device for the whole app.
-- **Win32 / WinRT platform APIs** — WASAPI, System Media Transport Controls, WLAN, Bluetooth, network information, WIC,
-  GDI text rendering, OLE drag and drop.
-- **[Inno Setup](https://jrsoftware.org/isinfo.php)** — the installer.
-- Bundled font: **[Inter](https://rsms.me/inter/)** (SIL Open Font License), with Segoe UI Variable as the fallback.
-  BreezeOS never uses fonts you installed yourself, so a broken third‑party font can’t garble its text.
+**BreezeOS tuyệt đối không thu thập, lưu trữ từ xa hay gửi bất kỳ dữ liệu cá nhân nào của bạn.** Không telemetry, không analytics, không quảng cáo, không yêu cầu đăng nhập. Mọi cấu hình đều nằm cục bộ trong `%APPDATA%\BreezeOS`.
 
-No Electron, no web view, no .NET runtime. Self‑written pieces include the QR‑code encoder, the LRC lyrics parser and the
-small HTTP server for *Send to phone*.
+- **Lời bài hát trực tuyến**: Chỉ khi bài hát không có tệp `.lrc` cục bộ, BreezeOS mới truy vấn [LRCLIB](https://lrclib.net) bằng tên bài, nghệ sĩ, album và thời lượng (có thể tắt trong *Cài đặt → Visor*).
+- **Kiểm tra bản cập nhật**: Định kỳ ~12 giờ/lần đọc danh sách bản phát hành công khai từ `api.github.com` của kho `thanhphong28/BreezeOS-win` (có thể tắt trong *Cài đặt → Chung → Giới thiệu*), và luôn xác thực mã băm SHA‑256 trước khi chạy bộ cài.
+- **Gửi sang điện thoại**: Chỉ khởi chạy máy chủ HTTP tạm thời trong **mạng LAN nội bộ** với đường dẫn ngẫu nhiên cho đúng các tệp bạn vừa thả vào, tự tắt khi bấm Hủy, sau 15 phút không hoạt động hoặc khi thoát BreezeOS.
+- **Bộ nhớ tạm & bàn phím**: Lịch sử bộ nhớ tạm chỉ giữ trong RAM (chỉ những mục bạn chủ động ghim mới được lưu cục bộ); hook bàn phím chỉ dùng duy nhất để bắt `Alt+Tab` khi bật Scene, tuyệt đối không ghi lại phím gõ.
 
 ---
 
-## 🛠 Build from source
+## 🛠 Công nghệ cốt lõi
+
+- **[Rust](https://www.rust-lang.org)** — Toàn bộ ứng dụng được tổ chức thành 5 crate gọn nhẹ, an toàn bộ nhớ.
+- **[windows‑rs](https://github.com/microsoft/windows-rs)** — Giao tiếp trực tiếp với hệ thống Win32 và WinRT API.
+- **Windows.UI.Composition** — Kết xuất đồ họa kính mờ, hiệu ứng khúc xạ, đổ bóng và chuyển động lò xo trực tiếp trên GPU thông qua một thiết bị đồ họa dùng chung duy nhất.
+- **Win32 / WinRT Platform APIs** — WASAPI, System Media Transport Controls, WLAN, Bluetooth, WIC, GDI & OLE Drag-and-Drop.
+- **[Inno Setup](https://jrsoftware.org/isinfo.php)** — Đóng gói bộ cài đặt nhỏ gọn cho Windows.
+- **Phông chữ đi kèm**: **[Inter](https://rsms.me/inter/)** (SIL Open Font License 1.1) kết hợp Segoe UI Variable dự phòng.
+
+---
+
+## 🏗 Build từ mã nguồn
 
 <details>
-<summary><b>Step by step</b></summary>
+<summary><b>Hướng dẫn chi tiết từng bước</b></summary>
 
-### 1. Install the toolchain
+### 1. Cài đặt công cụ biên dịch
 
-1. Install **Rust** with [rustup](https://rustup.rs) and select the MSVC toolchain:
+1. Cài đặt **Rust** qua [rustup](https://rustup.rs) với MSVC toolchain:
    ```powershell
    rustup default stable-x86_64-pc-windows-msvc
    ```
-2. Install **Visual Studio Build Tools** with the workload **Desktop development with C++** (includes `link.exe` and the Windows 11 SDK).
-3. Install **Git**.
+2. Cài đặt **Visual Studio Build Tools** với gói **Desktop development with C++** (bao gồm `link.exe` và Windows 11 SDK).
+3. Cài đặt **Git**.
 
-### 2. Clone and build
+### 2. Sao chép mã nguồn & biên dịch
 
 ```powershell
 git clone https://github.com/thanhphong28/BreezeOS-win.git
@@ -525,84 +280,58 @@ cargo build --release
 .\target\release\breezeos.exe
 ```
 
-You get `breezeos.exe` and `breezeos-guard.exe` in `target\release\`.
+Sau khi build xong, hai tệp `breezeos.exe` và `breezeos-guard.exe` sẽ nằm tại `target\release\`.
 
-> **“link.exe not found”?** Install the C++ workload above, or create a local `.cargo\config.toml` that points Cargo at `rust-lld`
-> and your MSVC / Windows SDK library folders. `.cargo/` is git‑ignored because it holds machine‑specific paths.
-
-### 3. Tests and release build
+### 3. Chạy kiểm thử & đóng gói bộ cài
 
 ```powershell
 cargo test --workspace
 
-winget install JRSoftware.InnoSetup                            # once
+winget install JRSoftware.InnoSetup                            # chỉ cần cài một lần
 powershell -File installer\build-installer.ps1 -Version 1.0.0
 ```
 
-The release script rebuilds BreezeOS with local paths stripped, **refuses to continue** if a binary still contains your user
-name or a local path, and writes `dist\BreezeOS-Setup-1.0.0.exe` and `dist\BreezeOS-1.0.0-win-x64.zip`.
+Kịch bản đóng gói sẽ tự động xóa đường dẫn cục bộ khỏi binary, kiểm tra quyền riêng tư trên tệp `.exe` và xuất ra `dist\BreezeOS-Setup-1.0.0.exe` cùng `dist\BreezeOS-1.0.0-win-x64.zip`.
 
-### 4. Safe experiments
-
-Run an **isolated** instance that does not touch your real settings:
+### 4. Chạy thử nghiệm cô lập an toàn
 
 ```powershell
 $env:NACRE_CONFIG_DIR = "$PWD\target\cfg-test"
 .\target\release\breezeos.exe --keep-taskbar --exit-after 30
 ```
 
-Useful flags: `--keep-taskbar`, `--no-dock`, `--no-island`, `--no-hud`, `--open-settings`, `--open-widgets`,
-`--exit-after <seconds>`, `--add-app <path>`, `--set-icon <app|start|launchpad> <image>`.
-
-> With Scene on, BreezeOS moves your real windows. Let a test instance exit normally (`--exit-after`) instead of killing it.
-
-Testing several screens on one display: set `NACRE_FAKE_MONITORS_FILE` to a text file such as
-`0,0,960,1080;960,0,960,1080@144` (each screen is `x,y,width,height`, optional `@dpi`, the first one is the main screen).
-BreezeOS splits your display into those screens and re‑reads the file every second, so editing it simulates plugging or
-unplugging a screen.
+Các cờ dòng lệnh hữu ích: `--keep-taskbar`, `--no-dock`, `--no-island`, `--no-hud`, `--open-settings`, `--open-widgets`, `--exit-after <giây>`, `--add-app <đường_dẫn>`, `--set-icon <app|start|launchpad> <ảnh>`.
 
 </details>
 
-### Project layout
+### Cấu trúc thư mục dự án
 
-| Path | Contents |
+| Đường dẫn | Vai trò |
 |---|---|
-| `crates/core` | Pure, unit‑tested logic: Visor state, lyrics, QR codes, Deck layout, widgets, settings, i18n, icons |
-| `crates/platform` | Win32 / WinRT wrappers: windows, media, audio, Wi‑Fi, Bluetooth, downloads, icons, text, local send server |
-| `crates/ui` | The glass materials on `Windows.UI.Composition`, the shared graphics device and live window capture |
-| `crates/app` | The `breezeos` app: Deck, Visor, Rail, Quick Panel, Quick Search, Scene, Widgets, Settings |
-| `crates/guard` | `breezeos-guard`, the watchdog that restores the taskbar and moved windows |
-| `docs/` · `installer/` · `tools/` | Indonesian user guide, installer and release script, taskbar safety test |
-
-Internal crates are named `nacre-*` (the former codename), and some internal names (settings keys, window classes, flags such
-as `--no-dock`) keep their original words so existing settings keep working.
+| `crates/core` | Logic thuần có kiểm thử đơn vị (unit tests): trạng thái Visor, lời bài hát, mã QR, bố cục Deck, tiện ích, cài đặt, đa ngôn ngữ (`En`/`Vi`), xử lý biểu tượng |
+| `crates/platform` | Lớp giao tiếp Win32 / WinRT: quản lý cửa sổ, media, âm thanh, Wi‑Fi, Bluetooth, tải xuống, WIC, máy chủ gửi tệp nội bộ |
+| `crates/ui` | Chất liệu kính mờ trên `Windows.UI.Composition`, thiết bị đồ họa dùng chung và chụp cửa sổ trực tiếp |
+| `crates/app` | Ứng dụng chính `breezeos`: Deck, Visor, Rail, Quick Panel, Quick Search, Scene, Widgets, Cài đặt |
+| `crates/guard` | Tiến trình bảo vệ `breezeos-guard` tự động khôi phục Taskbar và các cửa sổ đã dịch chuyển nếu ứng dụng dừng đột ngột |
+| `assets/` · `installer/` · `tools/` | Logo & phông chữ đi kèm, kịch bản đóng gói Inno Setup / phát hành GitHub Release và công cụ kiểm tra an toàn Taskbar |
 
 ---
 
-## ⚙️ Configuration & troubleshooting
+## ⚙️ Cấu hình & Xử lý sự cố nhanh
 
-Settings live in `%APPDATA%\BreezeOS\settings.cfg` (plain `key=value`), next to `pins.txt` (Deck), `icons.txt` (custom icons),
-`cc_layout.txt` (Quick Panel), `widgets.txt` (widget positions), `actions.txt` (Quick Search quick keys),
-`stage_exclude.txt`, `lyrics\` and `breezeos.log`. Set `NACRE_CONFIG_DIR` to use another folder.
+Toàn bộ cấu hình được lưu dưới dạng văn bản thuần tại `%APPDATA%\BreezeOS\` (`settings.cfg`, `pins.txt`, `icons.txt`, `cc_layout.txt`, `widgets.txt`, `actions.txt`, `todo.txt`, `lyrics\` và `breezeos.log`).
 
-- **Taskbar missing after a crash** — start `breezeos.exe` and quit normally, or let `breezeos-guard.exe` do it.
-- **A window seems to have vanished** — Scene parked it. Start BreezeOS again; it restores parked windows.
-- **Phone can’t open the Send link** — same Wi‑Fi on both? Allow BreezeOS in Windows Firewall for Private networks.
-- **Wi‑Fi menu shows only saved networks** — Windows needs *Location* allowed before apps can see nearby networks.
-- **A hotkey does nothing** — another program owns the shortcut (see `breezeos.log`).
-
-**Known limitations**: dragging a Scene card onto the stage isn’t implemented (Shift‑click to group); Focus, Hotspot,
-Nearby Sharing and Airplane mode open the matching Windows Settings page; only Bluetooth audio devices connect from the menu;
-*Send to phone* sends files, not folders; the World Clock uses fixed time zones without daylight saving; multi‑screen support is new and
-has been tested with simulated screens, so please report how it behaves on your setup.
+- **Mất thanh Taskbar sau sự cố hiếm gặp**: Mở lại `breezeos.exe` rồi chọn *Thoát BreezeOS*, hoặc chạy `breezeos-guard.exe` để khôi phục ngay.
+- **Điện thoại không mở được liên kết QR gửi tệp**: Đảm bảo máy tính và điện thoại kết nối **cùng một mạng Wi‑Fi**, đồng thời cho phép BreezeOS đi qua Windows Firewall ở mạng Riêng tư (*Private networks*).
+- **Menu Wi‑Fi chỉ hiện các mạng đã lưu**: Windows yêu cầu cấp quyền *Vị trí (Location)* cho ứng dụng để quét danh sách Wi‑Fi xung quanh (BreezeOS không bao giờ đọc hay lưu vị trí của bạn).
+- **Phím tắt không phản hồi**: Một phần mềm khác trên máy đang chiếm dụng tổ hợp phím đó (kiểm tra chi tiết trong `breezeos.log`).
 
 ---
 
-## 📄 License
+## 👤 Tác giả & Giấy phép
 
-[PolyForm Noncommercial License 1.0.0](LICENSE.md). You may use, study, modify and share BreezeOS for **noncommercial** purposes;
-commercial use needs written permission from the copyright holder. This is a *source‑available* license, not an OSI‑approved open
-source license. The bundled **Inter** font is © The Inter Project Authors, under the SIL Open Font License 1.1
-(`assets/fonts/Inter-LICENSE.txt`).
+- **Phát triển & Duy trì**: **Nguyễn Thanh Phong (Breeze Boy)** — [@thanhphong28](https://github.com/thanhphong28)
+- **Kho mã nguồn chính thức**: [github.com/thanhphong28/BreezeOS-win](https://github.com/thanhphong28/BreezeOS-win)
+- **Giấy phép**: Phát hành theo [PolyForm Noncommercial License 1.0.0](LICENSE.md) — cho phép sử dụng, nghiên cứu, tùy biến và chia sẻ cho các mục đích **phi thương mại**. Phông chữ **Inter** đi kèm thuộc bản quyền © The Inter Project Authors theo giấy phép SIL Open Font License 1.1 (`assets/fonts/Inter-LICENSE.txt`).
 
-Required Notice: Copyright (c) 2026 Abdee Alfarizi
+Copyright © 2026 Nguyễn Thanh Phong (Breeze Boy).
