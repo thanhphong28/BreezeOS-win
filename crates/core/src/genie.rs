@@ -6,8 +6,11 @@ pub struct Rect {
     pub h: f32,
 }
 
-const LAG: f32 = 0.72;
-const NECK: f32 = 1.55;
+// Two-phase macOS-style Genie curve: the lower window pinches into a cosine S-curve funnel
+// anchored to the target icon edges, then slides smoothly down inside those curved walls.
+const PINCH_END: f32 = 0.42;
+const SLIDE_START: f32 = 0.22;
+const SLIDE_LAG: f32 = 0.35;
 
 fn smooth(x: f32) -> f32 {
     let x = x.clamp(0.0, 1.0);
@@ -19,30 +22,42 @@ fn smoother(x: f32) -> f32 {
     x * x * x * (x * (x * 6.0 - 15.0) + 10.0)
 }
 
+fn s_curve(u: f32) -> f32 {
+    let u = u.clamp(0.0, 1.0);
+    0.5 * (1.0 - (u * std::f32::consts::PI).cos())
+}
+
 fn lerp(a: f32, b: f32, t: f32) -> f32 {
     a + (b - a) * t
 }
 
 pub fn progress(i: usize, n: usize, tau: f32) -> f32 {
     let v = (i as f32 + 0.5) / n.max(1) as f32;
-    ((tau * (1.0 + LAG) - LAG * (1.0 - v)) / 1.0).clamp(0.0, 1.0)
+    let slide_t = ((tau - SLIDE_START) / (1.0 - SLIDE_START)).clamp(0.0, 1.0);
+    (slide_t * (1.0 + SLIDE_LAG) - SLIDE_LAG * (1.0 - v)).clamp(0.0, 1.0)
 }
 
 pub fn slice(i: usize, n: usize, tau: f32, win: Rect, icon: Rect) -> ((f32, f32), (f32, f32)) {
     let n = n.max(1);
     let sh = win.h / n as f32;
+    let pinch = smoother(tau / PINCH_END);
+    let slide_t = ((tau - SLIDE_START) / (1.0 - SLIDE_START)).clamp(0.0, 1.0);
     let y_of = |j: usize| -> f32 {
-        let down = smoother(progress(j, n, tau));
-        lerp(win.y + j as f32 * sh, icon.y + j as f32 * icon.h / n as f32, down)
+        let v = j as f32 / n as f32;
+        let p = (slide_t * (1.0 + SLIDE_LAG) - SLIDE_LAG * (1.0 - v)).clamp(0.0, 1.0);
+        lerp(win.y + j as f32 * sh, icon.y + j as f32 * icon.h / n as f32, smoother(p))
     };
-    let s = progress(i, n, tau);
     let y = y_of(i);
-    let y_next = if i + 1 < n { y_of(i + 1) } else { y + lerp(sh, icon.h / n as f32, smoother(s)) };
+    let y_next = y_of(i + 1);
     let row_h = (y_next - y).max(0.0);
-    let k = smooth(s * NECK);
-    let width = lerp(win.w, icon.w, k).max(1.0);
-    let cx = lerp(win.x + win.w / 2.0, icon.x + icon.w / 2.0, k);
-    ((cx - width / 2.0, y), (width / win.w.max(1.0), ((row_h + 1.5) / sh.max(0.001)).max(0.001)))
+    let y_mid = (y + y_next) * 0.5;
+    let span = icon.y - win.y;
+    let u = if span.abs() < 1.0 { 1.0 } else { ((y_mid - win.y) / span).clamp(0.0, 1.0) };
+    let k = pinch * s_curve(u);
+    let left = lerp(win.x, icon.x, k);
+    let right = lerp(win.x + win.w, icon.x + icon.w, k);
+    let width = (right - left).max(1.0);
+    ((left, y), (width / win.w.max(1.0), ((row_h + 1.4) / sh.max(0.001)).max(0.001)))
 }
 
 pub fn tau_at(t: f32, restore: bool) -> f32 {
@@ -51,7 +66,7 @@ pub fn tau_at(t: f32, restore: bool) -> f32 {
         let r = 1.0 - (1.0 - t).powi(3);
         1.0 - smoother(r)
     } else {
-        smooth(t)
+        lerp(t, smooth(t), 0.65)
     }
 }
 

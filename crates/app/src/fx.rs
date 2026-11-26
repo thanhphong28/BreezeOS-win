@@ -11,7 +11,8 @@ use std::sync::Mutex;
 use windows::core::w;
 use windows::Foundation::TimeSpan;
 use windows::UI::Composition::{
-    AnimationDelayBehavior, CompositionDrawingSurface, CompositionEasingFunction, CompositionObject, CompositionStretch, Compositor, ContainerVisual, SpriteVisual,
+    AnimationDelayBehavior, CompositionBitmapInterpolationMode, CompositionDrawingSurface, CompositionEasingFunction, CompositionObject,
+    CompositionStretch, Compositor, ContainerVisual, SpriteVisual,
 };
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
@@ -118,7 +119,7 @@ fn genie_on() -> bool {
     prefs::get().min_effect == 0
 }
 
-const START_DELAY: u32 = 40;
+const START_DELAY: u32 = 16;
 
 fn noop() {}
 
@@ -342,8 +343,8 @@ impl Kind {
     fn ms(self) -> u32 {
         let g = genie_on();
         match self {
-            Kind::Minimize => if g { 540 } else { 380 },
-            Kind::Restore => if g { 470 } else { 340 },
+            Kind::Minimize => if g { 440 } else { 360 },
+            Kind::Restore => if g { 400 } else { 320 },
             Kind::Close => 270,
             Kind::Open => 300,
         }
@@ -503,18 +504,20 @@ impl Fx {
         }
         let w = GRect { x: win.0 as f32, y: win.1 as f32, w: win.2.max(1) as f32, h: win.3.max(1) as f32 };
         let ic = GRect { x: icon.0 as f32, y: icon.1 as f32, w: icon.2.max(1) as f32, h: icon.3.max(1) as f32 };
-        let n = ((w.h / 5.0) as usize).clamp(48, 120);
+        let n = ((w.h / 10.0) as usize).clamp(40, 72);
         let sh = w.h / n as f32;
         let ms = if reverse { Kind::Restore.ms() } else { Kind::Minimize.ms() };
-        let samples = ((ms / 12) as usize).clamp(24, 48);
+        let samples = ((ms / 18) as usize).clamp(18, 28);
         let root = self.comp.CreateContainerVisual()?;
         self.surface.root.Children()?.InsertAtTop(&root)?;
+        let linear: CompositionEasingFunction = self.comp.CreateLinearEasingFunction()?.cast()?;
         let (dur, delay) = (span(ms), span(START_DELAY));
         let v3 = |p: (f32, f32), z: f32| Vector3 { X: p.0, Y: p.1, Z: z };
         for i in 0..n {
             let s = self.comp.CreateSpriteVisual()?;
             let b = self.comp.CreateSurfaceBrushWithSurface(&surface)?;
             b.SetStretch(CompositionStretch::Fill)?;
+            b.SetBitmapInterpolationMode(CompositionBitmapInterpolationMode::Linear)?;
             b.SetTransformMatrix(Matrix3x2 { M11: 1.0, M12: 0.0, M21: 0.0, M22: n as f32, M31: 0.0, M32: -(i as f32) * sh })?;
             s.SetBrush(&b)?;
             s.SetSize(Vector2 { X: w.w, Y: sh })?;
@@ -529,8 +532,10 @@ impl Fx {
             for k in 0..samples {
                 let t = k as f32 / (samples - 1) as f32;
                 let (o, sc) = genie::slice(i, n, genie::tau_at(t, reverse), w, ic);
-                ao.InsertKeyFrame(t, v3(o, 0.0))?;
-                asc.InsertKeyFrame(t, v3(sc, 1.0))?;
+                // Explicit LinearEasingFunction prevents WinRT Composition's default ease-in-out
+                // from stopping and restarting between every keyframe segment.
+                ao.InsertKeyFrameWithEasingFunction(t, v3(o, 0.0), &linear)?;
+                asc.InsertKeyFrameWithEasingFunction(t, v3(sc, 1.0), &linear)?;
             }
             for a in [&ao, &asc] {
                 a.SetDuration(dur)?;
@@ -543,13 +548,13 @@ impl Fx {
         }
         let fade = self.comp.CreateScalarKeyFrameAnimation()?;
         if reverse {
-            fade.InsertKeyFrame(0.0, 0.0)?;
-            fade.InsertKeyFrame(0.08, 1.0)?;
-            fade.InsertKeyFrame(1.0, 1.0)?;
+            fade.InsertKeyFrameWithEasingFunction(0.0, 0.0, &linear)?;
+            fade.InsertKeyFrameWithEasingFunction(0.08, 1.0, &linear)?;
+            fade.InsertKeyFrameWithEasingFunction(1.0, 1.0, &linear)?;
         } else {
-            fade.InsertKeyFrame(0.0, 1.0)?;
-            fade.InsertKeyFrame(0.88, 1.0)?;
-            fade.InsertKeyFrame(1.0, 0.0)?;
+            fade.InsertKeyFrameWithEasingFunction(0.0, 1.0, &linear)?;
+            fade.InsertKeyFrameWithEasingFunction(0.86, 1.0, &linear)?;
+            fade.InsertKeyFrameWithEasingFunction(1.0, 0.0, &linear)?;
         }
         fade.SetDuration(dur)?;
         fade.SetDelayTime(delay)?;
