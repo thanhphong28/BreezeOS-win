@@ -101,6 +101,7 @@ const WIN_H: f32 = 392.0;
 const SHADOW_PAD: f32 = 36.0;
 
 static NOTCH_HWND: AtomicIsize = AtomicIsize::new(0);
+static NOTCHES: std::sync::Mutex<Vec<isize>> = std::sync::Mutex::new(Vec::new());
 static BUSY: AtomicBool = AtomicBool::new(false);
 
 pub struct Options {
@@ -233,9 +234,11 @@ pub fn tasks_changed() {
 }
 
 fn on_windows_changed() {
-    let h = NOTCH_HWND.load(Ordering::Relaxed);
-    if h != 0 {
-        timer(HWND(h as *mut _), T_WINCHG, 150);
+    let list: Vec<isize> = NOTCHES.lock().map(|g| g.clone()).unwrap_or_default();
+    for h in list {
+        if h != 0 {
+            timer(HWND(h as *mut _), T_WINCHG, 150);
+        }
     }
 }
 
@@ -607,6 +610,11 @@ impl Notch {
             });
             n.refresh();
             SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(n) as isize);
+            if let Ok(mut g) = NOTCHES.lock() {
+                if !g.contains(&(hwnd.0 as isize)) {
+                    g.push(hwnd.0 as isize);
+                }
+            }
             if slot.is_none() {
                 NOTCH_HWND.store(hwnd.0 as isize, Ordering::Relaxed);
                 crate::services::register_island(hwnd);
@@ -3001,6 +3009,9 @@ unsafe extern "system" fn proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> 
             DefWindowProcW(hwnd, msg, wp, lp)
         }
         WM_DESTROY => {
+            if let Ok(mut g) = NOTCHES.lock() {
+                g.retain(|h| *h != hwnd.0 as isize);
+            }
             if NOTCH_HWND.load(Ordering::Relaxed) == hwnd.0 as isize {
                 NOTCH_HWND.store(0, Ordering::Relaxed);
             }

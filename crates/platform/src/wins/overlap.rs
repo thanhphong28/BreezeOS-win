@@ -4,7 +4,7 @@ use windows::Win32::Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_CLOAKED, DWMWA_
 use windows::Win32::Graphics::Gdi::{GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST};
 use windows::Win32::UI::WindowsAndMessaging::{
     GetClassNameW, GetWindowLongW, GetWindowRect, GetWindowThreadProcessId, IsIconic, IsWindow, IsWindowVisible,
-    IsZoomed, GWL_EXSTYLE, GWL_STYLE, WS_CAPTION, WS_EX_TOOLWINDOW,
+    IsZoomed, GWL_EXSTYLE, GWL_STYLE, WS_CAPTION, WS_EX_TOOLWINDOW, WS_THICKFRAME,
 };
 
 const EDGE_SLACK: i32 = 2;
@@ -17,8 +17,8 @@ pub fn exceeds(r: (i32, i32, i32, i32), work: (i32, i32, i32, i32)) -> bool {
     r.0 < work.0 - EDGE_SLACK || r.1 < work.1 - EDGE_SLACK || r.2 > work.2 + EDGE_SLACK || r.3 > work.3 + EDGE_SLACK
 }
 
-pub fn is_fullscreen(frame: (i32, i32, i32, i32), screen: (i32, i32), work: (i32, i32, i32, i32), zoomed: bool, caption: bool) -> bool {
-    covers(frame, screen) && (!zoomed || !caption || exceeds(frame, work))
+pub fn is_fullscreen(frame: (i32, i32, i32, i32), screen: (i32, i32), work: (i32, i32, i32, i32), zoomed: bool, caption: bool, thickframe: bool) -> bool {
+    covers(frame, screen) && (!zoomed || !caption || !thickframe || exceeds(frame, work))
 }
 
 fn work_area(h: HWND) -> Option<(i32, i32, i32, i32)> {
@@ -92,10 +92,12 @@ pub fn evaluate(fg: isize, own_pid: u32, dock: (i32, i32, i32, i32), area: nacre
             return none;
         }
         let frame = (r.left, r.top, r.right, r.bottom);
+        let style = GetWindowLongW(h, GWL_STYLE) as u32;
         let zoomed = IsZoomed(h).as_bool();
-        let caption = GetWindowLongW(h, GWL_STYLE) as u32 & WS_CAPTION.0 == WS_CAPTION.0;
+        let caption = style & WS_CAPTION.0 == WS_CAPTION.0;
+        let thickframe = style & WS_THICKFRAME.0 == WS_THICKFRAME.0;
         let work = work_area(h).map(|w| (w.0 - area.x, w.1 - area.y, w.2 - area.x, w.3 - area.y)).unwrap_or((0, 0, screen.0, screen.1));
-        let fullscreen = is_fullscreen(frame, screen, work, zoomed, caption) || exclusive_fullscreen();
+        let fullscreen = is_fullscreen(frame, screen, work, zoomed, caption, thickframe) || exclusive_fullscreen();
         if fullscreen || zoomed {
             return Overlap { overlapped: true, fullscreen };
         }
@@ -119,27 +121,32 @@ mod tests {
 
     #[test]
     fn browser_fullscreen_one_pixel_short_counts() {
-        assert!(is_fullscreen((0, 0, 1920, 1079), SCREEN, FULL_WORK, false, false));
+        assert!(is_fullscreen((0, 0, 1920, 1079), SCREEN, FULL_WORK, false, false, false));
     }
 
     #[test]
     fn fullscreen_from_maximized_without_title_bar_counts() {
-        assert!(is_fullscreen((0, 0, 1920, 1080), SCREEN, FULL_WORK, true, false));
+        assert!(is_fullscreen((0, 0, 1920, 1080), SCREEN, FULL_WORK, true, false, false));
+    }
+
+    #[test]
+    fn browser_youtube_fullscreen_without_thickframe_counts_even_when_zoomed_and_work_equals_screen() {
+        assert!(is_fullscreen((0, 0, 1920, 1080), SCREEN, FULL_WORK, true, true, false));
     }
 
     #[test]
     fn maximized_window_beyond_reserved_work_area_counts() {
-        assert!(is_fullscreen((0, 0, 1920, 1080), SCREEN, RESERVED_WORK, true, true));
+        assert!(is_fullscreen((0, 0, 1920, 1080), SCREEN, RESERVED_WORK, true, true, true));
     }
 
     #[test]
     fn plain_maximized_window_is_not_fullscreen() {
-        assert!(!is_fullscreen((0, 0, 1920, 1080), SCREEN, FULL_WORK, true, true));
-        assert!(!is_fullscreen((0, 30, 1920, 1000), SCREEN, RESERVED_WORK, true, true));
+        assert!(!is_fullscreen((0, 0, 1920, 1080), SCREEN, FULL_WORK, true, true, true));
+        assert!(!is_fullscreen((0, 30, 1920, 1000), SCREEN, RESERVED_WORK, true, true, true));
     }
 
     #[test]
     fn small_window_is_not_fullscreen() {
-        assert!(!is_fullscreen((100, 100, 900, 700), SCREEN, FULL_WORK, false, true));
+        assert!(!is_fullscreen((100, 100, 900, 700), SCREEN, FULL_WORK, false, true, true));
     }
 }
