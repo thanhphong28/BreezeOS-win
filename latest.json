@@ -1,18 +1,18 @@
 {
-  "prerelease": false,
-  "draft": false,
-  "tag_name": "v1.0.10",
+  "tag_name": "v1.1.0",
   "assets": [
     {
-      "name": "BreezeOS-Setup-1.0.10.exe",
-      "digest": "sha256:f48bff09b7662c5aa5173676a48730c2956653955621a0aec979772d4dd4b3cb",
-      "browser_download_url": "https://github.com/thanhphong28/BreezeOS-win/releases/download/v1.0.10/BreezeOS-Setup-1.0.10.exe"
+      "digest": "sha256:f020e7353af4f9c9ab0f396fc1f04e72ebd63db00f1a81fd6e1b49c7908b259a",
+      "browser_download_url": "https://github.com/thanhphong28/BreezeOS-win/releases/download/v1.1.0/BreezeOS-Setup-1.1.0.exe",
+      "name": "BreezeOS-Setup-1.1.0.exe"
     },
     {
-      "name": "BreezeOS-1.0.10-win-x64.zip",
-      "digest": "sha256:e45ee3615a877ec1a9aca137ea1eb9435d8f6d961a3d2f62a077458504002af8",
-      "browser_download_url": "https://github.com/thanhphong28/BreezeOS-win/releases/download/v1.0.10/BreezeOS-1.0.10-win-x64.zip"
+      "digest": "sha256:5642f69a58bbbc191136f3e464cea54597c9241bb1dae5acc0a93d50c7789fa2",
+      "browser_download_url": "https://github.com/thanhphong28/BreezeOS-win/releases/download/v1.1.0/BreezeOS-1.1.0-win-x64.zip",
+      "name": "BreezeOS-1.1.0-win-x64.zip"
     }
   ],
-  "html_url": "https://github.com/thanhphong28/BreezeOS-win/releases/tag/v1.0.10"
+  "draft": false,
+  "html_url": "https://github.com/thanhphong28/BreezeOS-win/releases/tag/v1.1.0",
+  "prerelease": false
 }
