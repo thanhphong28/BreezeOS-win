@@ -183,22 +183,12 @@ impl GlassPanel {
     }
 
     fn paint_spec(&self) -> Result<()> {
-        let liquify = self.p.get().liquify;
         let stops = self.spec_brush.ColorStops()?;
         stops.Clear()?;
-        if liquify {
-            self.spec_brush.SetStartPoint(Vector2 { X: 0.0, Y: 0.0 })?;
-            self.spec_brush.SetEndPoint(Vector2 { X: 0.65, Y: 1.0 })?;
-            stops.Append(&self.comp.CreateColorGradientStopWithOffsetAndColor(0.0, Color { A: 58, R: 255, G: 255, B: 255 })?)?;
-            stops.Append(&self.comp.CreateColorGradientStopWithOffsetAndColor(0.28, Color { A: 14, R: 255, G: 255, B: 255 })?)?;
-            stops.Append(&self.comp.CreateColorGradientStopWithOffsetAndColor(0.62, Color { A: 0, R: 255, G: 255, B: 255 })?)?;
-            stops.Append(&self.comp.CreateColorGradientStopWithOffsetAndColor(1.0, Color { A: 22, R: 235, G: 245, B: 255 })?)?;
-        } else {
-            self.spec_brush.SetStartPoint(Vector2 { X: 0.0, Y: 0.0 })?;
-            self.spec_brush.SetEndPoint(Vector2 { X: 0.0, Y: 1.0 })?;
-            stops.Append(&self.comp.CreateColorGradientStopWithOffsetAndColor(0.0, Color { A: 70, R: 255, G: 255, B: 255 })?)?;
-            stops.Append(&self.comp.CreateColorGradientStopWithOffsetAndColor(0.34, Color { A: 0, R: 255, G: 255, B: 255 })?)?;
-        }
+        self.spec_brush.SetStartPoint(Vector2 { X: 0.0, Y: 0.0 })?;
+        self.spec_brush.SetEndPoint(Vector2 { X: 0.0, Y: 1.0 })?;
+        stops.Append(&self.comp.CreateColorGradientStopWithOffsetAndColor(0.0, Color { A: 70, R: 255, G: 255, B: 255 })?)?;
+        stops.Append(&self.comp.CreateColorGradientStopWithOffsetAndColor(0.34, Color { A: 0, R: 255, G: 255, B: 255 })?)?;
         Ok(())
     }
 
@@ -224,6 +214,7 @@ impl GlassPanel {
         if !active {
             self.refract.SetOpacity(0.0)?;
             self.caustic.SetOpacity(0.0)?;
+            self.spec.SetOpacity(p.highlight * if tier == Tier::Solid { 0.5 } else { 1.0 })?;
             self.rim.SetOpacity(1.0)?;
             return Ok(());
         }
@@ -252,6 +243,7 @@ impl GlassPanel {
         }
         self.refract.SetOpacity(0.95)?;
         self.caustic.SetOpacity(1.0)?;
+        self.spec.SetOpacity(0.0)?;
         self.rim.SetOpacity(0.0)?;
         Ok(())
     }

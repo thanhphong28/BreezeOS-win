@@ -182,7 +182,7 @@ fn widget_monitor() -> nacre_core::display::Monitor {
 }
 
 fn style() -> u8 {
-    if prefs::get().refraction { 1 } else { prefs::get().widget_style }
+    prefs::get().widget_style
 }
 
 fn palette(kind: Kind) -> (Option<Color>, [u8; 3]) {
