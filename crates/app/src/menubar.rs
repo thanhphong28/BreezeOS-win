@@ -194,7 +194,17 @@ unsafe extern "system" fn ll_mouse(code: i32, wp: WPARAM, lp: LPARAM) -> LRESULT
 }
 
 fn loc_hook(ev: u32, hwnd: isize) {
-    if hwnd != 0 && (ev == tracker::EV_FOREGROUND || (ev == tracker::EV_LOCATION && hwnd == focus::foreground())) {
+    if hwnd != 0
+        && (matches!(
+            ev,
+            tracker::EV_FOREGROUND
+                | tracker::EV_CLOAKED
+                | tracker::EV_MINIMIZE_START
+                | tracker::EV_MINIMIZE_END
+                | tracker::EV_DESTROY
+                | tracker::EV_MOVESIZE_END
+        ) || (ev == tracker::EV_LOCATION && hwnd == focus::foreground()))
+    {
         CTL.with(|c| {
             if let Some(ctl) = c.borrow().as_ref() {
                 unsafe {
@@ -676,15 +686,15 @@ impl Bar {
     }
 
     fn refresh_app(&mut self) -> bool {
-        self.refresh_app_for(focus::foreground())
+        self.refresh_app_for(tracker::external_foreground())
     }
 
     fn refresh_app_for(&mut self, fg: isize) -> bool {
+        self.check_fullscreen();
         if fg == 0 || fg == self.popup.hwnd.0 as isize {
             return false;
         }
         let mut changed = false;
-        self.check_fullscreen();
         let native = nacre_platform::menus::read(fg).unwrap_or_default();
         let titles = |v: &Vec<nacre_platform::menus::Top>| v.iter().map(|t| t.title.clone()).collect::<Vec<_>>();
         if titles(&native) != titles(&self.native) {

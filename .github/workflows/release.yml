@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Phiên bản cần đóng gói (ví dụ: 1.0.10)"
+        description: "Phiên bản cần đóng gói (ví dụ: 1.1.0)"
         required: false
-        default: "1.0.10"
+        default: "1.1.0"
 
 permissions:
   contents: write
