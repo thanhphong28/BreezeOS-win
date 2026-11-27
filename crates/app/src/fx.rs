@@ -29,6 +29,18 @@ const T_RESTORE: usize = 4;
 static FX_HWND: AtomicIsize = AtomicIsize::new(0);
 static FLAGGED: Mutex<Vec<isize>> = Mutex::new(Vec::new());
 static OPEN_PARKED: Mutex<Option<Parked>> = Mutex::new(None);
+static MIN_HINT: Mutex<Option<(isize, (i32, i32, i32, i32), std::time::Instant)>> = Mutex::new(None);
+
+pub fn hint_minimize_icon(hwnd: isize, icon: (i32, i32, i32, i32)) {
+    *MIN_HINT.lock().unwrap_or_else(|e| e.into_inner()) = Some((hwnd, icon, std::time::Instant::now()));
+}
+
+fn take_minimize_hint(hwnd: isize) -> Option<(i32, i32, i32, i32)> {
+    let mut g = MIN_HINT.lock().unwrap_or_else(|e| e.into_inner());
+    let (h, icon, at) = (*g)?;
+    *g = None;
+    (h == hwnd && at.elapsed().as_millis() < 800).then_some(icon)
+}
 const T_OPEN_POLL: usize = 7;
 const T_OPEN_END: usize = 8;
 const OPEN_WAIT_MS: u128 = 320;
@@ -675,8 +687,14 @@ impl Fx {
         }
     }
 
-    fn icon_rect(&self, hwnd: isize) -> (i32, i32, i32, i32) {
-        crate::dock::icon_rect_for(hwnd).unwrap_or((self.screen.0 / 2 - 24, self.screen.1 - 70, 48, 48))
+    fn icon_rect(&self, hwnd: isize, win_rect: (i32, i32, i32, i32)) -> (i32, i32, i32, i32) {
+        if let Some(r) = take_minimize_hint(hwnd) {
+            return r;
+        }
+        crate::dock::icon_rect_near(hwnd, win_rect).unwrap_or_else(|| {
+            let area = nacre_platform::monitors::at(win_rect.0 + win_rect.2 / 2, win_rect.1 + win_rect.3 / 2).area;
+            (area.x + area.w / 2 - 24, area.bottom() - 70, 48, 48)
+        })
     }
 
     fn on_event(&mut self, event: u32, h: isize) {
@@ -696,15 +714,15 @@ impl Fx {
                     }
                 }
             }
-            tracker::EV_MOVESIZE_END if h == self.current => unsafe {
+            tracker::EV_MOVESIZE_END | tracker::EV_LOCATION if h == self.current && !focus::is_minimized(h) => unsafe {
                 SetTimer(Some(self.hwnd), T_CAPTURE, 350, None);
             },
             tracker::EV_MINIMIZE_START => {
                 if let Some(s) = &self.snap {
                     if s.hwnd == h && self.pending_restore.is_none() {
                         let (surface, rect) = (s.surface.clone(), s.rect);
-                        crate::dock::reveal_for(START_DELAY + Kind::Minimize.ms() + 450);
-                        let icon = self.icon_rect(h);
+                        let icon = self.icon_rect(h, rect);
+                        crate::dock::reveal_at(icon, START_DELAY + Kind::Minimize.ms() + 450);
                         let keep = s.clone();
                         self.play(surface, rect, icon, Kind::Minimize);
                         self.parked.retain(|p| p.hwnd != h);
@@ -996,5 +1014,12 @@ mod tests {
         let bottom_ring = (((681 + 44 + 8) / 4) as u32 * bw + (bw / 2)) as usize * 4 + 3;
         assert_eq!(data[center], 0);
         assert!(data[bottom_ring] > 0);
+    }
+
+    #[test]
+    fn minimize_icon_hint_matches_clicked_dock_once() {
+        hint_minimize_icon(999, (2731, 1014, 40, 40));
+        assert_eq!(take_minimize_hint(999), Some((2731, 1014, 40, 40)));
+        assert_eq!(take_minimize_hint(999), None);
     }
 }

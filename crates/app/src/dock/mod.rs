@@ -325,19 +325,45 @@ fn on_windows_changed() {
     }
 }
 
-pub fn reveal_for(ms: u32) {
-    for h in all_docks() {
-        with_dock(HWND(h as *mut _), |d| {
-            d.revealing = true;
-            d.update_visibility();
-            timer(d.hwnd, TIMER_REVEAL, ms);
-        });
+pub fn reveal_at(icon: (i32, i32, i32, i32), ms: u32) {
+    let area = nacre_platform::monitors::at(icon.0 + icon.2 / 2, icon.1 + icon.3 / 2).area;
+    let docks = all_docks();
+    let mut matched = false;
+    for h in &docks {
+        if with_dock(HWND(*h as *mut _), |d| {
+            if d.area == area {
+                d.revealing = true;
+                d.update_visibility();
+                timer(d.hwnd, TIMER_REVEAL, ms);
+                true
+            } else {
+                false
+            }
+        })
+        .unwrap_or(false)
+        {
+            matched = true;
+        }
+    }
+    if !matched {
+        for h in docks {
+            with_dock(HWND(h as *mut _), |d| {
+                d.revealing = true;
+                d.update_visibility();
+                timer(d.hwnd, TIMER_REVEAL, ms);
+            });
+        }
     }
 }
 
-pub fn icon_rect_for(hwnd: isize) -> Option<(i32, i32, i32, i32)> {
-    let win_area = nacre_platform::wins::snapshot::frame_rect(hwnd)
-        .map(|(x, y, w, h)| nacre_platform::monitors::at(x + w / 2, y + h / 2).area);
+pub fn icon_rect_near(hwnd: isize, rect: (i32, i32, i32, i32)) -> Option<(i32, i32, i32, i32)> {
+    let win_area = if rect.2 > 0 && rect.3 > 0 && rect.0 > -16000 && rect.1 > -16000 {
+        Some(nacre_platform::monitors::at(rect.0 + rect.2 / 2, rect.1 + rect.3 / 2).area)
+    } else {
+        nacre_platform::wins::snapshot::frame_rect(hwnd)
+            .filter(|(x, y, _, _)| *x > -16000 && *y > -16000)
+            .map(|(x, y, w, h)| nacre_platform::monitors::at(x + w / 2, y + h / 2).area)
+    };
     let docks = all_docks();
     if let Some(area) = win_area {
         for h in &docks {
@@ -1405,12 +1431,15 @@ impl Dock {
     }
 
     fn activate_target(&self, target: isize) -> bool {
+        let icon = self.icon_rect(target);
         if focus::is_minimized(target) {
-            if let Some(r) = self.icon_rect(target) {
+            if let Some(r) = icon {
                 if crate::fx::restore(target, r, self.hwnd.0 as isize) {
                     return true;
                 }
             }
+        } else if let Some(r) = icon {
+            crate::fx::hint_minimize_icon(target, r);
         }
         focus::activate(target, self.hwnd.0 as isize)
     }
