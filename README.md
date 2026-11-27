@@ -12,7 +12,7 @@
 <p align="center">
   <a href="https://github.com/thanhphong28/BreezeOS-win/releases"><img alt="Lượt tải" src="https://img.shields.io/github/downloads/thanhphong28/BreezeOS-win/total?label=l%C6%B0%E1%BB%A3t%20t%E1%BA%A3i&color=brightgreen"></a>
   <img alt="Windows 11" src="https://img.shields.io/badge/Windows-11-0078D4?logo=windows11&logoColor=white">
-  <img alt="Phiên bản" src="https://img.shields.io/badge/phi%C3%AAn%20b%E1%BA%A3n-1.0.9-0a84ff">
+  <img alt="Phiên bản" src="https://img.shields.io/badge/phi%C3%AAn%20b%E1%BA%A3n-1.0.10-0a84ff">
   <img alt="Rust" src="https://img.shields.io/badge/Vi%E1%BA%BFt%20b%E1%BA%B1ng-Rust-orange?logo=rust">
   <img alt="Ngôn ngữ" src="https://img.shields.io/badge/Ng%C3%B4n%20ng%E1%BB%AF-Ti%E1%BA%BFng%20Vi%E1%BB%87t%20%C2%B7%20English-purple">
   <img alt="Quyền riêng tư" src="https://img.shields.io/badge/thu%20th%E1%BA%ADp%20d%E1%BB%AF%20li%E1%BB%87u-kh%C3%B4ng-success">
@@ -53,8 +53,9 @@ Toàn bộ chương trình là một tệp thực thi thuần bản địa duy n
   <img src="assets/screenshots/desktop.png" alt="Màn hình BreezeOS với Breeze Bar, Upper Bar, Breeze Notch và Tiện ích màn hình" width="900">
 </p>
 
-### 🌟 Điểm nổi bật trên phiên bản 1.0.9
+### 🌟 Điểm nổi bật trên phiên bản 1.0.10
 
+- **Tách riêng ứng dụng Web / PWA & Microsoft Store khỏi trình duyệt**: Các ứng dụng cài đặt riêng chạy trên nền Edge / Chrome (như Facebook, YouTube, YouTube Music, Outlook PWA...) nay hiển thị độc lập trên **Breeze Bar**, **Upper Bar**, **Switcher (`Alt+Tab`)** và **Scene** với đúng biểu tượng và tên riêng giống Windows 11, hỗ trợ ghim/mở độc lập mà không bị gộp chung vào trình duyệt.
 - **Real Liquid Glass (Kính lỏng quang học thời gian thực)**: Nâng cấp toàn diện chất liệu kính trên Breeze Bar, Quick Panel, Tìm kiếm nhanh, Tiện ích màn hình, thực đơn, xem trước cửa sổ và Breeze Notch với hiệu ứng khúc xạ lăng kính cong 3D (meniscus refraction), tán sắc quang phổ RGB ở viền kính và phản xạ vòm kép chạy trực tiếp trong DWM GPU mà gần như không tốn thêm RAM.
 - **Tùy biến kích thước độc lập hoàn toàn**:
   - **Breeze Notch** cho phép chỉnh riêng **Chiều rộng (`60%–180%`)** và **Chiều cao (`70%–180%`)** theo đúng tỷ lệ mong muốn.
@@ -98,12 +99,12 @@ Tải bản phát hành mới nhất tại trang **[Releases](https://github.com
 
 | Tệp tải về | Khuyên dùng cho |
 |---|---|
-| `BreezeOS-Setup-1.0.9.exe` | **Đa số người dùng.** Cài đặt theo tài khoản người dùng (không cần quyền Quản trị viên / Admin), tùy chọn tạo lối tắt Start Menu và khởi động cùng Windows, hỗ trợ tự động cập nhật và gỡ cài đặt sạch qua *Cài đặt Windows → Ứng dụng*. |
-| `BreezeOS-1.0.9-win-x64.zip` | **Bản chạy ngay (Portable).** Giải nén vào bất kỳ thư mục nào và giữ `breezeos.exe`, `breezeos-guard.exe` cùng thư mục `fonts` nằm chung với nhau. |
+| `BreezeOS-Setup-1.0.10.exe` | **Đa số người dùng.** Cài đặt theo tài khoản người dùng (không cần quyền Quản trị viên / Admin), tùy chọn tạo lối tắt Start Menu và khởi động cùng Windows, hỗ trợ tự động cập nhật và gỡ cài đặt sạch qua *Cài đặt Windows → Ứng dụng*. |
+| `BreezeOS-1.0.10-win-x64.zip` | **Bản chạy ngay (Portable).** Giải nén vào bất kỳ thư mục nào và giữ `breezeos.exe`, `breezeos-guard.exe` cùng thư mục `fonts` nằm chung với nhau. |
 
 ### Cài đặt bằng bộ cài `.exe`
 
-1. Chạy `BreezeOS-Setup-1.0.9.exe`.
+1. Chạy `BreezeOS-Setup-1.0.10.exe`.
 2. Nếu Windows SmartScreen hiển thị cảnh báo ứng dụng chưa ký số thương mại, chọn **More info → Run anyway** (chỉ thực hiện với tệp tải trực tiếp từ kho lưu trữ chính thức này).
 3. Chọn tùy chọn mong muốn (tạo lối tắt Start Menu, khởi động cùng Windows) và hoàn tất.
 
@@ -114,7 +115,7 @@ Một số trình quét heuristic có thể cảnh báo nhầm do tệp thực t
 Để tự kiểm tra tính toàn vẹn của tệp cài đặt:
 
 ```powershell
-Get-FileHash .\BreezeOS-Setup-1.0.9.exe -Algorithm SHA256
+Get-FileHash .\BreezeOS-Setup-1.0.10.exe -Algorithm SHA256
 ```
 
 Đối chiếu kết quả với mã **SHA‑256** công bố trên trang Releases — hoặc bạn có thể tự biên dịch trực tiếp từ mã nguồn theo hướng dẫn bên dưới.
@@ -293,10 +294,10 @@ Sau khi build xong, hai tệp `breezeos.exe` và `breezeos-guard.exe` sẽ nằm
 cargo test --workspace
 
 winget install JRSoftware.InnoSetup                            # chỉ cần cài một lần
-powershell -File installer\build-installer.ps1 -Version 1.0.9
+powershell -File installer\build-installer.ps1 -Version 1.0.10
 ```
 
-Kịch bản đóng gói sẽ tự động xóa đường dẫn cục bộ khỏi binary, kiểm tra quyền riêng tư trên tệp `.exe` và xuất ra `dist\BreezeOS-Setup-1.0.9.exe` cùng `dist\BreezeOS-1.0.9-win-x64.zip`.
+Kịch bản đóng gói sẽ tự động xóa đường dẫn cục bộ khỏi binary, kiểm tra quyền riêng tư trên tệp `.exe` và xuất ra `dist\BreezeOS-Setup-1.0.10.exe` cùng `dist\BreezeOS-1.0.10-win-x64.zip`.
 
 ### 4. Chạy thử nghiệm cô lập an toàn
 

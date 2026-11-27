@@ -57,6 +57,18 @@ pub fn resolve_shortcut(path: &str) -> Option<String> {
         let target = String::from_utf16_lossy(&buf[..n]);
         let _ = w!("");
         if !target.is_empty() {
+            let file_name = target.rsplit(['\\', '/']).next().unwrap_or(&target);
+            if crate::wins::identity::is_browser_host(file_name) {
+                if let Ok(store) = windows::core::Interface::cast::<windows::Win32::UI::Shell::PropertiesSystem::IPropertyStore>(&link) {
+                    if let Some(id) = crate::wins::identity::aumid_from_store(&store) {
+                        if crate::wins::identity::is_browser_webapp_aumid(file_name, &id) {
+                            if let Some(shell) = crate::wins::identity::resolve_webapp_path(&id) {
+                                return Some(shell);
+                            }
+                        }
+                    }
+                }
+            }
             return Some(target);
         }
         let pidl = link.GetIDList().ok()?;

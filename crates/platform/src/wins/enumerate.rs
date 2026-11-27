@@ -135,6 +135,8 @@ unsafe extern "system" fn each(hwnd: HWND, lparam: LPARAM) -> BOOL {
             Some(id) => super::identity::shell_path(&id),
             None => format!("{path}?{title}"),
         };
+    } else if let Some(webapp) = super::identity::browser_webapp_path(file, hwnd.0 as isize) {
+        path = webapp;
     }
     let name = super::names::friendly(&path);
     ctx.out.push(Win { hwnd: hwnd.0 as isize, path, title, name });

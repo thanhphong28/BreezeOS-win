@@ -237,4 +237,33 @@ mod tests {
         assert_eq!(name_from_path("C:\\Program Files\\App\\my.app.exe"), "my.app");
         assert_eq!(name_from_path("noext"), "noext");
     }
+
+    #[test]
+    fn browser_hosted_webapps_stay_separate_from_pinned_browser() {
+        let mut seen = vec![];
+        let edge_pin = Pin {
+            path: "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe".into(),
+            name: "Microsoft Edge".into(),
+        };
+        let wins = [
+            Win {
+                hwnd: 10,
+                path: "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe".into(),
+                title: "New tab - Microsoft Edge".into(),
+                name: "Microsoft Edge".into(),
+            },
+            Win {
+                hwnd: 20,
+                path: "shell:AppsFolder\\FACEBOOK.FACEBOOK_8xx8rvfyw5nnt!App".into(),
+                title: "Facebook".into(),
+                name: "Facebook".into(),
+            },
+        ];
+        let items = merge(&[edge_pin], &wins, &|_| 0, &mut seen);
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0].name, "Microsoft Edge");
+        assert_eq!(items[0].hwnds, vec![10]);
+        assert_eq!(items[1].name, "Facebook");
+        assert_eq!(items[1].hwnds, vec![20]);
+    }
 }
