@@ -16,11 +16,15 @@ pub fn glass_params(radius: f32) -> GlassParams {
     if is_black() {
         g.tint = Color { A: 255, R: ONYX.0, G: ONYX.1, B: ONYX.2 };
         g.solid = Color { A: 245, R: ONYX.0, G: ONYX.1, B: ONYX.2 };
+        g.rim = Color { A: 0, R: 255, G: 255, B: 255 };
+        g.highlight = 0.0;
+    } else if g.liquify {
+        g.tint.A = g.tint.A.max(56);
     } else {
         g.tint.A = g.tint.A.max(96);
+        g.rim = Color { A: 0, R: 255, G: 255, B: 255 };
+        g.highlight = 0.0;
     }
-    g.rim = Color { A: 0, R: 255, G: 255, B: 255 };
-    g.highlight = 0.0;
     g
 }
 

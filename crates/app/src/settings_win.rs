@@ -30,7 +30,7 @@ const SIDE_INSET: f32 = 8.0;
 const SIDE_RADIUS: f32 = 18.0;
 
 fn side_glass(mut g: nacre_ui::glass::GlassParams) -> nacre_ui::glass::GlassParams {
-    g.blur_sigma = g.blur_sigma.max(16.0);
+    g.blur_sigma = g.blur_sigma.max(if g.liquify { 5.0 } else { 16.0 });
     g
 }
 

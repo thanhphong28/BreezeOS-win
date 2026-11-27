@@ -182,12 +182,13 @@ fn widget_monitor() -> nacre_core::display::Monitor {
 }
 
 fn style() -> u8 {
-    prefs::get().widget_style
+    if prefs::get().refraction { 1 } else { prefs::get().widget_style }
 }
 
 fn palette(kind: Kind) -> (Option<Color>, [u8; 3]) {
     if style() == 1 {
-        return (None, [255, 255, 255]);
+        let fg = if prefs::look(prefs::Role::Dock).dark { [255, 255, 255] } else { [20, 22, 28] };
+        return (None, fg);
     }
     let dark = prefs::look(prefs::Role::Themed).dark;
     if dark || kind.dark_card() {
@@ -965,7 +966,7 @@ impl Mgr {
         let d = self.dpi;
         let (gw, gh) = (760.0 * d, 500.0 * d);
         let mut glass = prefs::glass((gw, gh), 26.0 * d, prefs::Role::Themed);
-        glass.blur_sigma = glass.blur_sigma.max(22.0);
+        glass.blur_sigma = glass.blur_sigma.max(if glass.liquify { 7.0 } else { 22.0 });
         let Ok(mut popup) = Popup::new_with(&self.comp, w!("BreezeOSWidgetGallery"), Some(gallery_proc), WINDOW_EX_STYLE(0), glass, true) else { return };
         let mon = self.mon;
         let _ = popup.set_rect(mon.x + ((mon.w as f32 - gw) / 2.0) as i32, mon.y + (mon.h as f32 - gh - 110.0 * d).max(40.0 * d) as i32, gw as i32, gh as i32);

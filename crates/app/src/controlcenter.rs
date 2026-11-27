@@ -181,6 +181,7 @@ pub fn init(comp: &Compositor) -> windows_core::Result<()> {
         let class = w!("BreezeOSCcCtl");
         RegisterClassW(&WNDCLASSW { lpfnWndProc: Some(ctl_proc), hInstance: hi, lpszClassName: class, ..Default::default() });
         let hwnd = CreateWindowExW(WINDOW_EX_STYLE(0), class, w!("breezeos-cc-ctl"), WS_POPUP, 0, 0, 0, 0, Some(HWND_MESSAGE), None, Some(hi), None)?;
+        prefs::listen(hwnd);
         let (layout, sizes) = controls::from_text_sized(&std::fs::read_to_string(layout_file()).unwrap_or_default());
         CC.with(|c| {
             *c.borrow_mut() = Some(Cc {
@@ -1625,6 +1626,18 @@ unsafe extern "system" fn ctl_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
         }
         WM_VALUES => {
             with(|c| c.update_values());
+            LRESULT(0)
+        }
+        m if m == prefs::WM_PREFS => {
+            with(|c| {
+                if c.panel.is_some() && !c.closing {
+                    c.build();
+                }
+                if let Some(g) = &c.gallery {
+                    let base = GlassParams::dark((10.0, 10.0), 26.0 * g.dpi);
+                    let _ = g.popup.panel.set_params(prefs::apply(base, &prefs::look(prefs::Role::Dark)));
+                }
+            });
             LRESULT(0)
         }
         WM_TIMER if wp.0 == T_CLOSE => {

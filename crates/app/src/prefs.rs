@@ -89,16 +89,21 @@ pub fn bar_look() -> Look {
 pub fn look(role: Role) -> Look {
     let mut s = get();
     let dark_sys = sys::apps_dark();
+    let shared_mat = if s.refraction && s.dock_material == settings::Material::Black {
+        settings::Material::Glass
+    } else {
+        s.dock_material
+    };
     match role {
         Role::Dock => settings::look(&s, dark_sys, s.dock_material),
         Role::Notch => {
             s.theme = settings::Theme::Dark;
             settings::look(&s, dark_sys, s.notch_material)
         }
-        Role::Themed => settings::look(&s, dark_sys, s.dock_material),
+        Role::Themed => settings::look(&s, dark_sys, shared_mat),
         Role::Dark => {
             s.theme = settings::Theme::Dark;
-            settings::look(&s, dark_sys, s.dock_material)
+            settings::look(&s, dark_sys, shared_mat)
         }
     }
 }

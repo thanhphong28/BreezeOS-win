@@ -1121,22 +1121,42 @@ pub fn look(s: &Settings, system_dark: bool, material: Material) -> Look {
     let (mut tr, mut tg, mut tb) = (tr, tg, tb);
     match material {
         Material::Glass => {
-            a = if dark { lerp(120.0, 22.0, t) } else { lerp(80.0, 18.0, t) };
+            a = if s.refraction {
+                if dark { lerp(68.0, 14.0, t) } else { lerp(50.0, 10.0, t) }
+            } else if dark {
+                lerp(120.0, 22.0, t)
+            } else {
+                lerp(80.0, 18.0, t)
+            };
             if !dark {
-                (tr, tg, tb) = (226, 231, 240);
+                (tr, tg, tb) = if s.refraction { (238, 244, 255) } else { (226, 231, 240) };
+            } else if s.refraction {
+                (tr, tg, tb) = (16, 20, 28);
             }
-            blur_sigma = lerp(1.5, 7.0, b) * sigma_k;
-            saturation = saturation.max(1.4);
-            rim = [140, 255, 255, 255];
-            highlight = 0.35;
+            blur_sigma = if s.refraction { lerp(1.5, 6.0, b) * sigma_k } else { lerp(1.5, 7.0, b) * sigma_k };
+            saturation = saturation.max(if s.refraction { 1.55 } else { 1.4 });
+            rim = if s.refraction { [230, 255, 255, 255] } else { [140, 255, 255, 255] };
+            highlight = if s.refraction { 0.72 } else { 0.35 };
         }
         Material::Blur => {
-            a = if dark { lerp(100.0, 30.0, t) } else { lerp(120.0, 40.0, t) };
-            (tr, tg, tb) = if dark { (26, 28, 30) } else { (240, 242, 246) };
-            blur_sigma = lerp(8.0, 36.0, b);
-            saturation = 1.1;
-            rim = if dark { [34, 255, 255, 255] } else { [60, 255, 255, 255] };
-            highlight = 0.2;
+            a = if s.refraction {
+                if dark { lerp(86.0, 22.0, t) } else { lerp(78.0, 20.0, t) }
+            } else if dark {
+                lerp(100.0, 30.0, t)
+            } else {
+                lerp(120.0, 40.0, t)
+            };
+            (tr, tg, tb) = if dark { (22, 26, 32) } else { (240, 244, 250) };
+            blur_sigma = if s.refraction { lerp(5.5, 18.0, b) } else { lerp(8.0, 36.0, b) };
+            saturation = if s.refraction { 1.45 } else { 1.1 };
+            rim = if s.refraction {
+                [210, 255, 255, 255]
+            } else if dark {
+                [34, 255, 255, 255]
+            } else {
+                [60, 255, 255, 255]
+            };
+            highlight = if s.refraction { 0.60 } else { 0.2 };
         }
         Material::Black => {
             (tr, tg, tb) = (10, 10, 12);
@@ -1148,7 +1168,7 @@ pub fn look(s: &Settings, system_dark: bool, material: Material) -> Look {
             highlight = 0.0;
         }
     }
-    let liquify = material == Material::Glass && s.refraction;
+    let liquify = material != Material::Black && s.refraction;
     let mut l = Look { dark, blur_sigma, saturation, tint: [a.round() as u8, tr, tg, tb], rim, solid, highlight, fg, liquify };
     crate::theme::tune(&mut l, s.preset);
     l
@@ -1190,11 +1210,9 @@ mod tests {
 
     #[test]
     fn legacy_glass_bar_becomes_transparent_and_light_glass_is_brighter() {
-        let s = Settings::parse("menubar_glass=true
-menubar_style=glass
-");
+        let s = Settings::parse("menubar_glass=true\nmenubar_style=glass\n");
         assert!(!s.menubar_glass, "latar kaca lama menjadi transparan");
-        let mut st = Settings::default();
+        let mut st = Settings { refraction: false, ..Settings::default() };
         st.theme = Theme::Light;
         let light = look(&st, false, Material::Glass);
         st.theme = Theme::Dark;
@@ -1267,13 +1285,13 @@ dock_margin=900");
         let s = Settings::default();
         let glass = look(&s, true, Material::Glass);
         let blur = look(&s, true, Material::Blur);
+        let black = look(&s, true, Material::Black);
         assert!(blur.blur_sigma > glass.blur_sigma * 1.5, "blur {} vs glass {}", blur.blur_sigma, glass.blur_sigma);
-        assert!(glass.liquify && !blur.liquify, "Crystal = gaya Liquify");
-        assert!(glass.blur_sigma <= 7.0 && glass.rim[0] == 140, "Liquify: blur tipis, kilau atas 55%");
+        assert!(glass.liquify && blur.liquify && !black.liquify, "Real Liquid Glass nâng cấp cả Glass và Blur");
+        assert!(glass.blur_sigma <= 7.0 && glass.rim[0] >= 200);
         let no_refr = Settings { refraction: false, ..Settings::default() };
-        assert!(!look(&no_refr, true, Material::Glass).liquify, "refraksi dimatikan: kaca biasa");
+        assert!(!look(&no_refr, true, Material::Glass).liquify && !look(&no_refr, true, Material::Blur).liquify);
         assert!(blur.dark && !look(&s, false, Material::Blur).dark);
-        assert!(blur.tint[0] >= 60 && blur.rim[0] > 0 && blur.rim[0] < 60, "rim Blur sangat tipis");
         assert_eq!(Material::parse("blur"), Some(Material::Blur));
         assert_eq!(Material::Blur.key(), "blur");
         assert_eq!(Material::ALL.len(), 3);
