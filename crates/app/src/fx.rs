@@ -217,7 +217,8 @@ fn shadow_bitmap(w: i32, h: i32, m: i32, dy: f32, radius: f32, k: i32) -> (u32, 
     let (fw, fh) = (w + 2 * m, h + 2 * m);
     let (bw, bh) = (((fw / k).max(2)) as u32, ((fh / k).max(2)) as u32);
     let (hx, hy) = (w as f32 / 2.0, h as f32 / 2.0);
-    let (cx, cy) = (fw as f32 / 2.0, fh as f32 / 2.0 + dy);
+    let (wcx, wcy) = (fw as f32 / 2.0, fh as f32 / 2.0);
+    let (cx, cy) = (wcx, wcy + dy);
     let r = radius.min(hx).min(hy);
     let blur = 30.0f32;
     let peak = 0.26f32;
@@ -228,9 +229,13 @@ fn shadow_bitmap(w: i32, h: i32, m: i32, dy: f32, radius: f32, k: i32) -> (u32, 
             let (qx, qy) = ((px - cx).abs() - (hx - r), (py - cy).abs() - (hy - r));
             let d = (qx.max(0.0).powi(2) + qy.max(0.0).powi(2)).sqrt() + qx.max(qy).min(0.0) - r;
             let t = (d / blur).clamp(0.0, 1.0);
-            let a = peak * (1.0 - t) * (1.0 - t) * (1.0 - t);
+            let a_sh = peak * (1.0 - t) * (1.0 - t) * (1.0 - t);
+            // Hollow out the window interior so even transient topmost races can never dim the client area.
+            let (wx, wy) = ((px - wcx).abs() - (hx - r), (py - wcy).abs() - (hy - r));
+            let d_win = (wx.max(0.0).powi(2) + wy.max(0.0).powi(2)).sqrt() + wx.max(wy).min(0.0) - r;
+            let mask = ((d_win + 4.0) / 4.0).clamp(0.0, 1.0);
             let i = ((y * bw + x) * 4) as usize;
-            out[i + 3] = (a * 255.0).round() as u8;
+            out[i + 3] = (a_sh * mask * 255.0).round() as u8;
         }
     }
     (bw, bh, out)
@@ -764,7 +769,12 @@ impl Fx {
             self.hide_shadow();
             return;
         }
-        if snapshot::frame_rect(t) != Some(self.shadow_rect) {
+        let topmost_mismatch = self.shadow.as_ref().is_some_and(|sh| unsafe {
+            let t_top = GetWindowLongW(HWND(t as *mut _), GWL_EXSTYLE) as u32 & WS_EX_TOPMOST.0 != 0;
+            let s_top = GetWindowLongW(sh.hwnd, GWL_EXSTYLE) as u32 & WS_EX_TOPMOST.0 != 0;
+            t_top != s_top
+        });
+        if snapshot::frame_rect(t) != Some(self.shadow_rect) || topmost_mismatch {
             self.update_shadow(t, true);
         }
     }
@@ -855,8 +865,13 @@ impl Fx {
                 this.shadow_key = key;
             }
             unsafe {
-                let below = GetWindow(HWND(h as *mut _), GW_HWNDNEXT).unwrap_or(HWND_BOTTOM);
-                let _ = SetWindowPos(sh.hwnd, Some(below), x - m, y - m, fw, fh, SWP_NOACTIVATE | SWP_SHOWWINDOW);
+                let target = HWND(h as *mut _);
+                let t_top = GetWindowLongW(target, GWL_EXSTYLE) as u32 & WS_EX_TOPMOST.0 != 0;
+                let s_top = GetWindowLongW(sh.hwnd, GWL_EXSTYLE) as u32 & WS_EX_TOPMOST.0 != 0;
+                if !t_top && s_top {
+                    let _ = SetWindowPos(sh.hwnd, Some(HWND_NOTOPMOST), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+                }
+                let _ = SetWindowPos(sh.hwnd, Some(target), x - m, y - m, fw, fh, SWP_NOACTIVATE | SWP_SHOWWINDOW);
             }
             Ok(())
         };
@@ -967,5 +982,19 @@ unsafe extern "system" fn shadow_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPAR
         WM_MOUSEACTIVATE => LRESULT(MA_NOACTIVATE as isize),
         WM_NCHITTEST => LRESULT(-1),
         _ => DefWindowProcW(hwnd, msg, wp, lp),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn shadow_bitmap_is_transparent_inside_window_and_shaded_outside() {
+        let (bw, bh, data) = shadow_bitmap(552, 681, 44, 10.0, 8.0, 4);
+        let center = ((bh / 2) * bw + (bw / 2)) as usize * 4 + 3;
+        let bottom_ring = (((681 + 44 + 8) / 4) as u32 * bw + (bw / 2)) as usize * 4 + 3;
+        assert_eq!(data[center], 0);
+        assert!(data[bottom_ring] > 0);
     }
 }

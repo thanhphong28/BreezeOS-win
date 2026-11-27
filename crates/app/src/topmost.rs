@@ -60,7 +60,9 @@ unsafe extern "system" fn collect(h: HWND, lp: LPARAM) -> BOOL {
     let mut pid = 0u32;
     GetWindowThreadProcessId(h, Some(&mut pid));
     if pid == std::process::id() && IsWindowVisible(h).as_bool() && GetWindowLongW(h, GWL_EXSTYLE) as u32 & WS_EX_TOPMOST.0 != 0 {
-        v.push(h.0 as isize);
+        if class_of(h) != "BreezeOSShadow" {
+            v.push(h.0 as isize);
+        }
     }
     BOOL(1)
 }
