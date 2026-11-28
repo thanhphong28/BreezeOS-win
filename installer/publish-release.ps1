@@ -53,16 +53,45 @@ if (-not $NoBuild -or -not (Test-Path $setupExe) -or -not (Test-Path $portableZi
   & (Join-Path $PSScriptRoot "build-installer.ps1") -Version $Version -NoBuild:$NoBuild
 }
 
+$shaSetup = (Get-FileHash $setupExe -Algorithm SHA256).Hash.ToLower()
+$shaZip   = (Get-FileHash $portableZip -Algorithm SHA256).Hash.ToLower()
+
+$notes = @"
+<p align="center">
+  <img src="https://raw.githubusercontent.com/thanhphong28/BreezeOS-win/main/assets/logo.png" alt="BreezeOS" width="140">
+</p>
+
+## ✨ BreezeOS $Version
+
+Giao diện kính mờ hiện đại cho **Windows 11** — phát triển bởi **Nguyễn Thanh Phong (Breeze Boy)**, viết thuần bằng **Rust** (~15 MB RAM khi chạy nền), hỗ trợ đầy đủ **Tiếng Việt** & **English**.
+
+### 📦 Tệp tải xuống
+- **Bộ cài đặt khuyên dùng**: ``BreezeOS-Setup-$Version.exe`` *(cài đặt không cần quyền Admin, hỗ trợ tự động cập nhật ngay trong ứng dụng)*
+- **Bản chạy ngay (Portable)**: ``BreezeOS-$Version-win-x64.zip`` *(giải nén và chạy trực tiếp ``breezeos.exe``)*
+
+### 🔐 Mã kiểm tra SHA-256
+| Tệp | SHA-256 |
+|---|---|
+| ``BreezeOS-Setup-$Version.exe`` | ``$shaSetup`` |
+| ``BreezeOS-$Version-win-x64.zip`` | ``$shaZip`` |
+"@
+
 if ($existing) {
-  $release = $existing
-  Write-Host "Updating existing release $tag..."
+  $patchBody = @{
+    name       = "BreezeOS $Version"
+    body       = $notes
+    draft      = $false
+    prerelease = $false
+  } | ConvertTo-Json
+  $release = Invoke-RestMethod -Method Patch -Uri "https://api.github.com/repos/$repo/releases/$($existing.id)" -Headers $headers -Body ([Text.Encoding]::UTF8.GetBytes($patchBody)) -ContentType "application/json; charset=utf-8"
+  Write-Host "Updated existing release $tag..."
 } else {
   Write-Host "Creating GitHub Release $tag (BreezeOS $Version)..."
   $body = @{
     tag_name               = $tag
     target_commitish       = "main"
     name                   = "BreezeOS $Version"
-    body                   = "## BreezeOS $Version`n`n- **Installer**: ``BreezeOS-Setup-$Version.exe`` (recommended, supports automatic in-app updates)`n- **Portable**: ``BreezeOS-$Version-win-x64.zip```n- **Languages**: English (default) & Vietnamese (Tiếng Việt)"
+    body                   = $notes
     draft                  = $false
     prerelease             = $false
     generate_release_notes = $true
@@ -85,4 +114,43 @@ foreach ($filePath in @($setupExe, $portableZip)) {
   Write-Host "Uploaded: $($uploaded.browser_download_url)"
 }
 
+# Update release-meta/latest.json so in-app updater immediately resolves the new version and SHA-256
+$metaObj = @{
+  tag_name   = $tag
+  html_url   = "https://github.com/$repo/releases/tag/$tag"
+  draft      = $false
+  prerelease = $false
+  assets     = @(
+    @{
+      name                 = "BreezeOS-Setup-$Version.exe"
+      browser_download_url = "https://github.com/$repo/releases/download/$tag/BreezeOS-Setup-$Version.exe"
+      digest               = "sha256:$shaSetup"
+    },
+    @{
+      name                 = "BreezeOS-$Version-win-x64.zip"
+      browser_download_url = "https://github.com/$repo/releases/download/$tag/BreezeOS-$Version-win-x64.zip"
+      digest               = "sha256:$shaZip"
+    }
+  )
+}
+$metaJson = $metaObj | ConvertTo-Json -Depth 5
+$b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($metaJson))
+
+try {
+  $existingMeta = Invoke-RestMethod -Uri "https://api.github.com/repos/$repo/contents/latest.json?ref=release-meta" -Headers $headers -ErrorAction Stop
+  $putBody = @{
+    message = "chore: update latest.json for $tag"
+    content = $b64
+    branch  = "release-meta"
+    sha     = $existingMeta.sha
+  } | ConvertTo-Json
+} catch {
+  $putBody = @{
+    message = "chore: publish latest.json for $tag"
+    content = $b64
+    branch  = "release-meta"
+  } | ConvertTo-Json
+}
+Invoke-RestMethod -Method Put -Uri "https://api.github.com/repos/$repo/contents/latest.json" -Headers $headers -Body ([Text.Encoding]::UTF8.GetBytes($putBody)) -ContentType "application/json; charset=utf-8" | Out-Null
+Write-Host "Updated CDN metadata on branch release-meta."
 Write-Host "Release $tag is live at: $($release.html_url)"

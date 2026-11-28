@@ -544,6 +544,16 @@ const EN: &[(&str, &str)] = &[
     ("Salin jalur", "Copy path"),
     ("Hapus dari Rak", "Remove from Shelf"),
     ("Salin ke folder", "Copy to folder"),
+    ("Breeze Mascot", "Breeze Mascot"),
+    ("Tampilkan mascot di Visor", "Show mascot in Breeze Notch"),
+    ("Frekuensi muncul", "Appearance interval"),
+    ("1 mnt", "1 min"),
+    ("3 mnt", "3 min"),
+    ("5 mnt", "5 min"),
+    ("10 mnt", "10 min"),
+    ("15 mnt", "15 min"),
+    ("Uji animasi mascot", "Preview mascot animation"),
+    ("Mainkan sekarang", "Play now"),
 ];
 
 const VI: &[(&str, &str)] = &[
@@ -1068,6 +1078,16 @@ const VI: &[(&str, &str)] = &[
     ("Salin jalur", "Sao chép đường dẫn"),
     ("Hapus dari Rak", "Gỡ khỏi Kệ tệp"),
     ("Salin ke folder", "Sao chép vào thư mục"),
+    ("Breeze Mascot", "Breeze Mascot"),
+    ("Tampilkan mascot di Visor", "Hiển thị mascot trên Breeze Notch"),
+    ("Frekuensi muncul", "Tần suất xuất hiện"),
+    ("1 mnt", "1 phút"),
+    ("3 mnt", "3 phút"),
+    ("5 mnt", "5 phút"),
+    ("10 mnt", "10 phút"),
+    ("15 mnt", "15 phút"),
+    ("Uji animasi mascot", "Xem thử hiệu ứng mascot"),
+    ("Mainkan sekarang", "Phát ngay"),
 ];
 
 const APP_MENU_VI: &[(&str, &str)] = &[

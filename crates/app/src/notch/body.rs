@@ -1,3 +1,4 @@
+use super::mascot::MascotLayer;
 use super::{ears, spring};
 use nacre_core::settings::Material;
 use nacre_platform::log;
@@ -52,6 +53,7 @@ pub struct Body {
     waves: Vec<(ContainerVisual, SpriteVisual, CompositionColorGradientStop, CompositionColorGradientStop)>,
     wave_key: (i32, i32),
     aurora_on: bool,
+    mascot: MascotLayer,
 }
 
 const WAVES: [(f32, f32, u32); 3] = [(0.30, 0.78, 7_200), (0.62, 0.70, 9_400), (0.86, 0.62, 11_800)];
@@ -110,6 +112,7 @@ impl Body {
             aurora.Children()?.InsertAtTop(&holder)?;
             waves.push((holder, sprite, s0, s1));
         }
+        let mascot = MascotLayer::new(comp, &depth, dpi)?;
         let content = comp.CreateContainerVisual()?;
         let ghost = comp.CreateContainerVisual()?;
         stage.Children()?.InsertAtTop(&ghost)?;
@@ -139,6 +142,7 @@ impl Body {
             waves,
             wave_key: (0, 0),
             aurora_on: false,
+            mascot,
         };
         body.paint_ears(tier);
         Ok(body)
@@ -153,6 +157,7 @@ impl Body {
     pub fn remake_ears(&mut self, gfx: &Gfx, dpi: f32, tier: Tier) {
         self.ear = (13.0 * dpi).ceil();
         self.top_over = 32.0 * dpi;
+        self.mascot.set_dpi(dpi);
         for (i, left) in [true, false].into_iter().enumerate() {
             let b = ears::bitmap(self.ear as u32, ONYX, 255, left);
             if let Ok(s) = gfx.surface_from_bgra(b.w, b.h, &b.bgra) {
@@ -248,6 +253,7 @@ impl Body {
         }
         let _ = self.sheen.SetOffset(Vector3 { X: x0, Y: -over, Z: 0.0 });
         let _ = self.sheen.SetSize(Vector2 { X: w, Y: h + over });
+        self.mascot.layout(x0, w, h, over, springy);
         let key = ((w / 8.0).round() as i32, (h / 8.0).round() as i32);
         if key == self.wave_key {
             for (i, (holder, _, _, _)) in self.waves.iter().enumerate() {
@@ -326,5 +332,13 @@ impl Body {
             }
             let _ = self.stage.SetOffset(Vector3 { X: 0.0, Y: gap, Z: 0.0 });
         }
+    }
+
+    pub fn play_mascot(&mut self, mood: nacre_core::notch::mascot::Mood, dpi: f32, reduce_motion: bool) {
+        self.mascot.play(mood, dpi, reduce_motion);
+    }
+
+    pub fn stop_mascot(&mut self) {
+        self.mascot.stop();
     }
 }

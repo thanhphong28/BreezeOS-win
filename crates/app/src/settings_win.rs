@@ -162,6 +162,9 @@ enum Action {
     DockPreview,
     RecordSearchKey,
     ResetSearchKey,
+    MascotOn,
+    MascotInterval(u8),
+    MascotPreview,
 }
 
 struct Region {
@@ -1034,6 +1037,34 @@ impl Win {
                     ]
                 },
             ), (
+                Some(prefs::tr("Breeze Mascot")),
+                {
+                    use nacre_core::notch::mascot::{interval_index, INTERVALS_MIN};
+                    let labels = ["1 mnt", "3 mnt", "5 mnt", "10 mnt", "15 mnt"];
+                    let mut rows = vec![RowDef::Toggle(
+                        prefs::tr("Tampilkan mascot di Visor"),
+                        s.mascot_enabled,
+                        Action::MascotOn,
+                    )];
+                    if s.mascot_enabled {
+                        rows.push(RowDef::Seg(
+                            prefs::tr("Frekuensi muncul"),
+                            INTERVALS_MIN
+                                .iter()
+                                .zip(labels)
+                                .map(|(&m, l)| (prefs::tr(l), Action::MascotInterval(m)))
+                                .collect(),
+                            interval_index(s.mascot_interval),
+                        ));
+                        rows.push(RowDef::Pick(
+                            prefs::tr("Uji animasi mascot"),
+                            prefs::tr("Mainkan sekarang").to_string(),
+                            Action::MascotPreview,
+                        ));
+                    }
+                    rows
+                },
+            ), (
                 Some(prefs::tr("Lirik")),
                 vec![
                     RowDef::Toggle(prefs::tr("Tampilkan lirik di Visor"), s.lyrics_compact, Action::LyricsCompact),
@@ -1858,6 +1889,14 @@ unsafe extern "system" fn proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> 
                 Some(Action::UiScale(v)) => prefs::update(|s| s.ui_scale = v),
                 Some(Action::WidgetStyle(v)) => prefs::update(|s| s.widget_style = v),
                 Some(Action::BatteryPct(v)) => prefs::update(|s| s.battery_pct = v),
+                Some(Action::MascotOn) => prefs::update(|s| s.mascot_enabled = !s.mascot_enabled),
+                Some(Action::MascotInterval(m)) => prefs::update(|s| s.mascot_interval = m),
+                Some(Action::MascotPreview) => {
+                    if !prefs::get().notch_enabled {
+                        prefs::update(|s| s.notch_enabled = true);
+                    }
+                    crate::notch::trigger_mascot();
+                }
                 Some(Action::WidgetGallery) => crate::widgets::open_gallery(),
                 Some(Action::NotchShape(b)) => prefs::update(|s| s.notch_island = b),
                 Some(Action::MenuLogoReset) => {

@@ -2,6 +2,7 @@ mod body;
 mod draw;
 mod drop;
 mod ears;
+mod mascot;
 mod shadow;
 mod views;
 
@@ -79,6 +80,8 @@ const T_TESTSEND: usize = 21;
 const T_PILL: usize = 22;
 const T_TODO: usize = 23;
 const T_CARET: usize = 24;
+const T_MASCOT_NEXT: usize = 25;
+const T_MASCOT_END: usize = 26;
 const WM_TODO_EDIT: u32 = WM_APP + 28;
 const WM_PILLS: u32 = WM_APP + 26;
 const WM_TASKS: u32 = WM_APP + 27;
@@ -198,6 +201,23 @@ static QR_TEXT: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
 const WM_QUICKDONE: u32 = WM_APP + 96;
 const WM_SHOWQR: u32 = WM_APP + 97;
 const WM_SHELFICON: u32 = WM_APP + 98;
+const WM_MASCOT: u32 = WM_APP + 99;
+
+pub fn trigger_mascot() {
+    let list: Vec<isize> = NOTCHES.lock().map(|g| g.clone()).unwrap_or_default();
+    if list.is_empty() {
+        let h = NOTCH_HWND.load(Ordering::Relaxed);
+        if h != 0 {
+            post(h, WM_MASCOT);
+        }
+        return;
+    }
+    for h in list {
+        if h != 0 {
+            post(h, WM_MASCOT);
+        }
+    }
+}
 
 pub fn show_qr(text: &str) -> bool {
     let h = NOTCH_HWND.load(Ordering::Relaxed);
@@ -443,6 +463,10 @@ pub struct Notch {
     surrogate: Option<u16>,
     todo_draft: String,
     _bt: Option<nacre_platform::devices::Watchers>,
+    mascot_on: bool,
+    mascot_mood: Option<nacre_core::notch::mascot::Mood>,
+    mascot_seq: u64,
+    mascot_cfg: (bool, u8),
 }
 
 impl Notch {
@@ -607,6 +631,13 @@ impl Notch {
                 surrogate: None,
                 todo_draft: String::new(),
                 _bt: None,
+                mascot_on: false,
+                mascot_mood: None,
+                mascot_seq: 0,
+                mascot_cfg: {
+                    let s = crate::prefs::get();
+                    (s.mascot_enabled, s.mascot_interval)
+                },
             });
             n.refresh();
             SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(n) as isize);
@@ -657,6 +688,7 @@ impl Notch {
                 d.publish_notch();
                 d.update_visibility();
                 d.sync_download_watch();
+                d.schedule_mascot(true);
             });
             crate::prefs::listen(hwnd);
             if ["NACRE_TEST_SEND", "NACRE_TEST_OPEN", "NACRE_TEST_QUICK", "NACRE_TEST_QR", "NACRE_TEST_SHELF"].iter().any(|k| std::env::var_os(k).is_some()) {
@@ -692,7 +724,89 @@ impl Notch {
             pill: self.pills.current(self.now_ms()).is_some(),
             meeting: self.meeting.is_some(),
             glance_pair: self.glance_pair(n_glance),
+            mascot: self.mascot_on,
         }
+    }
+
+    fn schedule_mascot(&self, initial: bool) {
+        kill(self.hwnd, T_MASCOT_NEXT);
+        let s = crate::prefs::get();
+        if self.off || !s.notch_enabled || !s.mascot_enabled {
+            return;
+        }
+        let ms = if let Some(override_ms) = std::env::var("NACRE_MASCOT_MS").ok().and_then(|v| v.parse::<u32>().ok()) {
+            override_ms.max(1_000)
+        } else if initial {
+            nacre_core::notch::mascot::INITIAL_GREET_MS
+        } else {
+            let slot_salt = self.slot.map(|i| (i as u64 + 1) * 0x2545_F491_4F6C_DD1D).unwrap_or(0);
+            let seed = (Self::epoch_ms() as u64) ^ self.mascot_seq.wrapping_mul(0x517C_C1B7_2722_0A95) ^ slot_salt;
+            nacre_core::notch::mascot::next_delay_ms(s.mascot_interval, seed)
+        };
+        timer(self.hwnd, T_MASCOT_NEXT, ms);
+    }
+
+    fn can_auto_mascot(&self) -> bool {
+        let s = crate::prefs::get();
+        if self.off || !s.notch_enabled || !s.mascot_enabled || self.overlap.fullscreen || self.interacting() {
+            return false;
+        }
+        if self.has_media && self.playing {
+            return false;
+        }
+        if (s.notch_downloads && (self.dl.is_some() || self.dl_done.is_some())) || self.send_compact().is_some() {
+            return false;
+        }
+        if self.pills.current(self.now_ms()).is_some() || self.meeting.is_some() {
+            return false;
+        }
+        if self.timer.phase == Phase::Running && self.timer.remaining_secs(self.now_ms()) <= 60 {
+            return false;
+        }
+        true
+    }
+
+    fn wake_mascot(&mut self, forced: bool) {
+        let s = crate::prefs::get();
+        if self.off || !s.notch_enabled {
+            return;
+        }
+        if !forced && !self.can_auto_mascot() {
+            self.schedule_mascot(false);
+            return;
+        }
+        if forced && matches!(self.mode, Mode::Open(_) | Mode::Drop) {
+            if self.todo_edit.is_some() {
+                self.suspend_edit();
+            }
+            self.mode = Mode::Rest;
+        }
+        self.mascot_seq = self.mascot_seq.wrapping_add(1);
+        let seed = (Self::epoch_ms() as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ self.mascot_seq;
+        let mood = nacre_core::notch::mascot::pick_mood(seed, self.mascot_mood);
+        self.mascot_mood = Some(mood);
+        self.mascot_on = true;
+        self.update_visibility();
+        self.refresh();
+        if self.look.view == View::Compact(state::Activity::Mascot) {
+            self.body.play_mascot(mood, self.dpi, s.reduce_motion);
+            let dur = nacre_core::notch::mascot::routine(mood, s.reduce_motion).duration_ms;
+            timer(self.hwnd, T_MASCOT_END, dur + 40);
+        } else {
+            self.mascot_on = false;
+        }
+        self.schedule_mascot(false);
+    }
+
+    fn end_mascot(&mut self) {
+        if !self.mascot_on {
+            return;
+        }
+        self.mascot_on = false;
+        kill(self.hwnd, T_MASCOT_END);
+        self.body.stop_mascot();
+        self.update_visibility();
+        self.refresh();
     }
 
     fn start_send(&mut self, paths: Vec<String>) {
@@ -1007,6 +1121,11 @@ impl Notch {
         }
         if next != self.mode {
             log::line("notch", &format!("{:?} --{ev:?}--> {next:?}", self.mode));
+            if matches!(next, Mode::Open(_) | Mode::Drop) && self.mascot_on {
+                self.mascot_on = false;
+                kill(self.hwnd, T_MASCOT_END);
+                self.body.stop_mascot();
+            }
             self.mode = next;
             self.refresh();
             self.update_visibility();
@@ -1043,6 +1162,11 @@ impl Notch {
         let first = self.first;
         self.first = false;
         self.look = new;
+        if old.view == View::Compact(state::Activity::Mascot) && new.view != View::Compact(state::Activity::Mascot) {
+            self.mascot_on = false;
+            kill(self.hwnd, T_MASCOT_END);
+            self.body.stop_mascot();
+        }
         let view_changed = old.view != new.view || first;
         if !matches!(new.view, View::Open(_)) {
             self.cal_sel = 0;
@@ -2414,7 +2538,7 @@ impl Notch {
             edge_armed: self.edge_armed,
             starting: self.starting,
             fullscreen: self.overlap.fullscreen,
-            revealing: !self.overlap.fullscreen && self.pills.current(self.now_ms()).is_some(),
+            revealing: !self.overlap.fullscreen && (self.pills.current(self.now_ms()).is_some() || self.mascot_on),
         };
         let hide = self.off || should_hide(self.vis, &inputs);
         if let Some(s) = &self.strip {
@@ -2492,6 +2616,16 @@ impl Notch {
         }
         self.update_visibility();
         self.sync_download_watch();
+        let mcfg = (s.mascot_enabled, s.mascot_interval);
+        if self.off || !s.mascot_enabled {
+            kill(self.hwnd, T_MASCOT_NEXT);
+            self.end_mascot();
+            self.mascot_cfg = mcfg;
+        } else if mcfg != self.mascot_cfg {
+            let turned_on = !self.mascot_cfg.0 && s.mascot_enabled;
+            self.mascot_cfg = mcfg;
+            self.schedule_mascot(turned_on);
+        }
         if s.capsule != self.glance_cfg {
             self.glance_cfg = s.capsule;
             self.glance_idx = 0;
@@ -2659,6 +2793,8 @@ impl Notch {
             }
             T_PILL => self.sync_pills(),
             T_TODO => self.schedule_tasks(),
+            T_MASCOT_NEXT => self.wake_mascot(false),
+            T_MASCOT_END => self.end_mascot(),
             T_TESTSEND => {
                 kill(self.hwnd, T_TESTSEND);
                 if let Ok(p) = std::env::var("NACRE_TEST_SEND") {
@@ -2887,6 +3023,10 @@ unsafe extern "system" fn proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> 
         }
         WM_SHOWQR => {
             with(hwnd, |d| d.on_show_qr());
+            LRESULT(0)
+        }
+        WM_MASCOT => {
+            with(hwnd, |d| d.wake_mascot(true));
             LRESULT(0)
         }
         WM_AFTERDROP => {

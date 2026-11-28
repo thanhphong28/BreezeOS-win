@@ -330,7 +330,7 @@ fn card(p: &Painter, c: &ContainerVisual, x: f32, y: f32, w: f32, h: f32) {
 
 pub fn draw(p: &mut Painter, c: &ContainerVisual, look: Look, f: Frame, d: &Data, regions: &mut Vec<Region>, live: &mut Live) {
     match look.view {
-        View::Rest => {}
+        View::Rest | View::Compact(Activity::Mascot) => {}
         View::Compact(Activity::Timer) | View::Compact(Activity::TimerEnding) => {
             let urgent = look.view == View::Compact(Activity::TimerEnding);
             compact_timer(p, c, f, d, urgent)

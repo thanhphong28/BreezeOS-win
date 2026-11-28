@@ -70,6 +70,7 @@ pub enum Activity {
     Download,
     Pill,
     Meeting,
+    Mascot,
     Player,
     Lyrics,
     Music,
@@ -95,6 +96,7 @@ pub struct Live {
     pub pill: bool,
     pub meeting: bool,
     pub glance_pair: bool,
+    pub mascot: bool,
 }
 
 pub fn activity(l: &Live) -> Option<Activity> {
@@ -109,6 +111,9 @@ pub fn activity(l: &Live) -> Option<Activity> {
     }
     if l.meeting {
         return Some(Activity::Meeting);
+    }
+    if l.mascot {
+        return Some(Activity::Mascot);
     }
     if l.media && l.wide_music {
         return Some(Activity::Player);
@@ -179,6 +184,7 @@ pub const PEEK_GROW: (f32, f32) = (16.0, 4.0);
 pub fn size(l: Look, dpi: f32) -> Size {
     let (mut w, mut h, mut r): (f32, f32, f32) = match l.view {
         View::Rest => (184.0, 30.0, 15.0),
+        View::Compact(Activity::Mascot) => (190.0, 34.0, 16.0),
         View::Compact(Activity::Lyrics) => (420.0, 32.0, 16.0),
         View::Compact(Activity::Glance) => (220.0, 30.0, 15.0),
         View::Compact(Activity::GlancePair) => (300.0, 30.0, 15.0),
@@ -277,7 +283,7 @@ mod tests {
 
     #[test]
     fn activity_priority() {
-        let base = Live { media: true, playing: true, lyric_line: true, lyrics_on: true, timer_left_s: Some(30), charging_fresh: true, shelf: 2, glance: true, download: true, wide_music: false, pill: false, meeting: false, glance_pair: false };
+        let base = Live { media: true, playing: true, lyric_line: true, lyrics_on: true, timer_left_s: Some(30), charging_fresh: true, shelf: 2, glance: true, download: true, wide_music: false, pill: false, meeting: false, glance_pair: false, mascot: false };
         assert_eq!(activity(&base), Some(Activity::TimerEnding));
         assert_eq!(activity(&Live { timer_left_s: Some(300), ..base }), Some(Activity::Download), "unduhan di atas lirik dan musik");
         let l = Live { timer_left_s: Some(300), download: false, ..base };
@@ -351,5 +357,8 @@ mod tests {
         assert_eq!(activity(&l), Some(Activity::Meeting));
         assert_eq!(activity(&Live { pill: true, ..l }), Some(Activity::Pill));
         assert_eq!(activity(&Live { meeting: false, ..l }), Some(Activity::Music));
+        assert_eq!(activity(&Live { meeting: false, mascot: true, ..l }), Some(Activity::Mascot));
+        let m = size(look(Mode::Rest, Some(Activity::Mascot)), 1.0);
+        assert_eq!((m.w, m.h, m.radius), (190.0, 34.0, 16.0));
     }
 }
